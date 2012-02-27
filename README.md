@@ -26,11 +26,13 @@ machine, and uses `psql` to load data.
 
 # Usage
 
-
     python dbtruck.py data/testfile.txt tablename dbname
     python dbtruck.py -h
 
-# TODOs
+# Comments
+
+If there are uses you would like to see, let me know!  I'm adding features for what
+I want, but I'm interested in other uses.
 
 
 Lots and lots of todos!
