@@ -17,4 +17,4 @@ is installed and running on your machine, and uses `psql` to load data.
 
 ## Load datafile.txt
 
-    python dbtruck.py datafile.txt tablename dbname
+    python dbtruck.py data/testfile.txt tablename dbname
