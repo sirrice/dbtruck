@@ -13,8 +13,8 @@ is installed and running on your machine, and uses `psql` to load data.
 
 ## Help me
 
-   python dbtruck.py -h
+    python dbtruck.py -h
 
 ## Load datafile.txt
 
-   python dbtruck.py datafile.txt tablename dbname
+    python dbtruck.py datafile.txt tablename dbname
