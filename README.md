@@ -24,6 +24,13 @@ will:
 `DBTruck` assumes that `PostgreSQL` is installed and running on your 
 machine, and uses `psql` to load data.
 
+# Requirements
+
+* Python
+* [dateutil](http://labix.org/python-dateutil#head-2f49784d6b27bae60cde1cff6a535663cf87497b)
+* [PostgreSQL](http://www.postgresql.org/download/) running locally
+* psql
+
 # Usage
 
     python dbtruck.py data/testfile.txt tablename dbname
@@ -34,6 +41,13 @@ machine, and uses `psql` to load data.
 If there are uses you would like to see, let me know!  I'm adding features for what
 I want, but I'm interested in other uses.
 
+In the future I would like to add
 
-Lots and lots of todos!
-
+* support for other databases
+* let you specify port/host etc
+* support additional data file types (json, fixed offset, serialized)
+* support renaming and reconfiguring the tables after the fact
+* inferring foreign key relationships
+* creating indexes
+* interactive interface instead of requiring command line flags
+* and more!

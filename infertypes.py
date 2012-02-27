@@ -4,6 +4,7 @@ from collections import *
 from dateutil.parser import parse as dateparse
 import math
 
+# notes: alter table readings alter column time type time using (time::time);
 
 def get_type(val):
     val = val.strip()
@@ -25,7 +26,7 @@ def get_type(val):
         if d.hour == d.minute and d.minute == d.microsecond and d.hour == 0:
             return datetime.date
         elif datetime.datetime.now().date() == d.date():
-            if datetime.hour != 0 and d.minute != 0 and d.microsecond != 0:
+            if d.hour != 0 or d.minute != 0 or d.second != 0 or d.microsecond != 0:
                 return datetime.time
     except:
         pass
