@@ -31,10 +31,16 @@ machine, and uses `psql` to load data.
 * [PostgreSQL](http://www.postgresql.org/download/) running locally
 * psql
 
+# Installation
+
+The installation should install an executable called `importmydata.py` into your path:
+
+    python setup.py install
+
 # Usage
 
-    python dbtruck.py data/testfile.txt tablename dbname
-    python dbtruck.py -h
+    importmydata.py -h
+    importmydata.py data/testfile.txt tablename dbname
 
 # Comments
 
