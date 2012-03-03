@@ -3,10 +3,10 @@ from collections import *
 from dateutil.parser import parse as dateparse
 
 moduledir = os.path.abspath(os.path.dirname(__file__)) 
-sys.path.extend( [moduledir, '%s/importers' % moduledir] )
+sys.path.append( moduledir )
 from infertypes import *
 from readers import *
-from pg import PGMethods
+
 
 logging.basicConfig()
 _log = logging.getLogger(__file__)
