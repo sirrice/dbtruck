@@ -1,4 +1,4 @@
-import subprocess, sys, csv, datetime, math, os, logging
+import subprocess, sys, csv, datetime, math, os, logging, re
 from collections import *
 from dateutil.parser import parse as dateparse
 
@@ -10,7 +10,8 @@ from readers import *
 
 logging.basicConfig()
 _log = logging.getLogger(__file__)
-
+re_space = re.compile('\s+')
+re_nonascii = re.compile('[^\w\s]')
 
 
 def wc(fname):
@@ -25,6 +26,9 @@ def infer_header_row(rowiter, types):
     matches = sum([ht == t and ht != None and t != str for ht, t in zip(htypes, types)])
     return matches == 0
 
+def clean_header(value):
+    return re_space.sub('_', re_nonascii.sub('', value.strip()).strip())
+
 
 def setup(fname, new, dbmethods):
     iterf = get_iter_f_csv(fname)
@@ -35,6 +39,7 @@ def setup(fname, new, dbmethods):
     header = None
     if infer_header_row(iterf(), types):
         header = rowiter.next()
+        header = map(clean_header, header)
 
     _log.info( 'types:\t%s', ' '.join(map(str,types)) )
     _log.info( 'headers:\t%s', header and ' '.join(header) or 'no header found' )

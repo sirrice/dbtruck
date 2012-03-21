@@ -12,15 +12,21 @@ def rows_consistent(iter):
     columns in each row.  Checks that >98% of the rows have the same number of columns
     @return (isconsistent, number of columns)
     """
-    iter.next()
-    lens = Counter()
-    for idx, row in enumerate(iter):
-        lens[len(row)] += 1
-        if idx > 10000: break
-    maj = lens.most_common(1)[0][1]
-    tot = sum(lens.values())
-    return float(maj)/tot >= 0.98, lens.most_common(1)[0][0]
-    
+    try:
+        idx = 0
+        iter.next()
+        lens = Counter()
+        for idx, row in enumerate(iter):
+            lens[len(row)] += 1
+            if idx > 10000: break
+        maj = lens.most_common(1)[0][1]
+        tot = sum(lens.values())
+        return float(maj)/tot >= 0.98, lens.most_common(1)[0][0]
+    except:
+        import traceback
+        traceback.print_exc()
+        print "Iteration ended at row %d" % (idx+1)
+
 
 def _get_reader(fname, delim):
     """
@@ -28,8 +34,20 @@ def _get_reader(fname, delim):
     """
     f = (line.strip() for line in open(fname, 'r'))
     if delim is None:
-        return csv.reader(f)
-    return csv.reader(f, delimiter=delim)
+        reader = csv.reader(f)
+    else:
+        reader = csv.reader(f, delimiter=delim)
+
+    try:
+        while True:
+            try:
+                yield reader.next()
+            except StopIteration:
+                break
+            except Exception as e:
+                _log.error(str(e))
+    except:
+        pass
 
 def get_reader(fname, offset=None):
     """
