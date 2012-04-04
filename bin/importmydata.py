@@ -1,6 +1,6 @@
 #!/usr/bin/env python 
 from dbtruck.dbtruck import *
-from dbtruck.importers.pg import PGMethods
+from dbtruck.exporters.pg import PGMethods
 
 if __name__ == '__main__':
     import argparse

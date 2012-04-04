@@ -49,6 +49,8 @@ I want, but I'm interested in other uses.
 
 In the future I would like to add
 
+* Good geocoder for location columns
+  * support for simple location joins
 * support for other databases
 * let you specify port/host etc
 * support additional data file types (json, fixed offset, serialized)

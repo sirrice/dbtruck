@@ -5,13 +5,14 @@ from dateutil.parser import parse as dateparse
 moduledir = os.path.abspath(os.path.dirname(__file__)) 
 sys.path.append( moduledir )
 from infertypes import *
-from readers import *
+from parsers.parsers import *
 
 
 logging.basicConfig()
 _log = logging.getLogger(__file__)
 re_space = re.compile('\s+')
 re_nonascii = re.compile('[^\w\s]')
+re_nonasciistart = re.compile('^[^\w]')
 
 
 def wc(fname):
@@ -27,11 +28,11 @@ def infer_header_row(rowiter, types):
     return matches == 0
 
 def clean_header(value):
-    return re_space.sub('_', re_nonascii.sub('', value.strip()).strip())
+    return re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
 
 
 def setup(fname, new, dbmethods):
-    iterf = get_iter_f_csv(fname)
+    iterf = get_reader(fname)
     types = infer_col_types(iterf())
     nlines = wc(fname)
     rowiter = iterf()

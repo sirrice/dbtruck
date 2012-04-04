@@ -3,7 +3,6 @@ from collections import *
 from dateutil.parser import parse as dateparse
 sys.path.append( os.path.abspath(os.path.dirname(__file__)) )
 from infertypes import *
-from readers import *
 from base import BaseMethods
 
 logging.basicConfig()

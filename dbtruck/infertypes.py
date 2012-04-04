@@ -28,6 +28,7 @@ def get_type(val):
         elif datetime.datetime.now().date() == d.date():
             if d.hour != 0 or d.minute != 0 or d.second != 0 or d.microsecond != 0:
                 return datetime.time
+        return datetime.datetime
     except:
         pass
 
