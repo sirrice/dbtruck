@@ -1,10 +1,13 @@
 import sys, csv, logging, datetime
 from collections import *
+from util import *
 from dateutil.parser import parse as dateparse
+from dbtruck.parsers.util import _get_reader
 import math
 
 logging.basicConfig()
 _log = logging.getLogger(__file__)
+_log.setLevel(logging.DEBUG)
 
 def rows_consistent(iter):
     """
@@ -27,27 +30,6 @@ def rows_consistent(iter):
         traceback.print_exc()
         print "Iteration ended at row %d" % (idx+1)
 
-
-def _get_reader(fname, delim):
-    """
-    creates an CSV based iterator
-    """
-    f = (line.strip() for line in open(fname, 'r'))
-    if delim is None:
-        reader = csv.reader(f)
-    else:
-        reader = csv.reader(f, delimiter=delim)
-
-    try:
-        while True:
-            try:
-                yield reader.next()
-            except StopIteration:
-                break
-            except Exception as e:
-                _log.error(str(e))
-    except:
-        pass
 
 def get_reader(fname, offset=None):
     """

@@ -41,9 +41,12 @@ class PGMethods(BaseMethods):
             for row in buf:
                 print >>f, ','.join(row)
 
-        with open('/dev/null', 'w') as devnull:
-            args = ['psql', '-c', "copy %s from '/tmp/tmp.load' with csv;" % self.tablename, self.dbname]
-            ret = subprocess.call(args, stdout=devnull, stderr=devnull)
+        with open('/tmp/import.output', 'w') as importoutput:
+            cmd = ["set client_encoding to 'utf8'",
+                   "copy %s from '/tmp/tmp.load' with csv;" % self.tablename]
+            cmd = ';'.join(cmd)
+            args = ['psql', '-c', cmd, self.dbname]
+            ret = subprocess.call(args, stdout=importoutput, stderr=importoutput)
 
         if ret == 0:
             return True
