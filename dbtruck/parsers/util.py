@@ -1,10 +1,17 @@
-import sys, csv, logging, datetime, math, re
+import sys
+import csv
+import logging
+import datetime
+import math
+import re
+
 from operator import and_
 from collections import *
 from dateutil.parser import parse as dateparse
 
-logging.basicConfig()
-_log = logging.getLogger(__file__)
+from ..util import get_logger
+
+_log = get_logger()
 
 
 def rows_consistent(iter):

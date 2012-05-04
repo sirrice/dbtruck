@@ -15,10 +15,10 @@ moduledir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append( moduledir )
 from infertypes import *
 from parsers.parsers import *
+from util import get_logger
 
 
-logging.basicConfig()
-_log = logging.getLogger(__file__)
+_log = get_logger()
 re_space = re.compile('\s+')
 re_nonascii = re.compile('[^\w\s]')
 re_nonasciistart = re.compile('^[^\w]')
@@ -38,7 +38,7 @@ def infer_header_row(rowiter, types):
     if matches > 0:
         return False
 
-    if max(map(len, header)) > 50:
+    if max(map(len, header)) > 100:
         return False
 
     # lots of more complex analysis goes HERE
@@ -47,8 +47,9 @@ def infer_header_row(rowiter, types):
 
 
 def clean_header(value):
-    return re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
-    
+    ret = re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
+    ret = str(unicode(ret, errors='ignore'))
+    return ret.lower()
 
 def infer_metadata(iterf):
     if not iterf.types:
@@ -70,13 +71,13 @@ def infer_metadata(iterf):
 
 
 def import_datafiles(fname, new, tablename, dbname, errfile, exportmethodsklass):
-    iterf_list = get_readers(fname)
-    for idx, iterf in enumerate(iterf_list):
+    for idx, iterf in enumerate(get_readers(fname)):
         try:
-            if len(iterf_list) > 1:
+            if idx > 0:
                 newtablename = '%s_%d' % (tablename, idx)            
             else:
                 newtablename = tablename
+
             exportmethods = exportmethodsklass(newtablename, dbname, errfile)
 
             infer_metadata(iterf)
@@ -119,7 +120,8 @@ def import_iterator(iterf, dbmethods):
             success = dbmethods.import_block(buf, iterf)
             _log.info( "loaded\t%s\t%d", success, rowidx )
             buf = []
-            start = time.time()            
+            start = time.time()
+            break
 
     if len(buf) > 0:
         success = dbmethods.import_block(buf, iterf)

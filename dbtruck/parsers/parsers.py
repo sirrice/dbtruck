@@ -14,11 +14,12 @@ from dateutil.parser import parse as dateparse
 from pyquery import PyQuery as pq
 
 from dataiter import DataIterator
+from ..util import get_logger
 from util import *
 from dbtruck.parsers.util import _get_reader
 
-logging.basicConfig()
-_log = logging.getLogger(__file__)
+
+_log = get_logger()
 
 
 
@@ -233,8 +234,7 @@ def get_reader_from_text_file(fname, **kwargs):
         except KeyboardInterrupt:
             pass
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            _log.info(e)
     if bestiter:
         _log.debug("best parser: %s", parser.__name__)
     else:

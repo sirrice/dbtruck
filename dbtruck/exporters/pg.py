@@ -15,13 +15,13 @@ from collections import *
 from dateutil.parser import parse as dateparse
 from StringIO import StringIO
 
+from ..util import get_logger
 from util import block_iter
 from infertypes import *
 from db import connect
 from base import BaseMethods
 
-logging.basicConfig()
-_log = logging.getLogger(__file__)
+_log = get_logger()
 copy_re = re.compile('line (?P<line>\d+), column\ (?P<col>\w+): \"(?P<val>.+)\"')
 
 
@@ -37,7 +37,7 @@ class PGMethods(BaseMethods):
         self.types = []
 
         self.prev_errors = defaultdict(list)
-        self.threshold = 30
+        self.threshold = 20
         
 
     def sql_create(self, types, attrs=None, new=True):
@@ -101,7 +101,7 @@ class PGMethods(BaseMethods):
             if col is None:
                 newrow.append('NULL')
             elif isinstance(col, basestring):
-                enc = col.encode('utf-8', errors='ignore')
+                enc = unicode(col, errors='ignore')
                 newrow.append(enc.replace('\t', ' '))
             else:
                 newrow.append(str(col).replace('\t', ' '))
@@ -142,7 +142,12 @@ class PGMethods(BaseMethods):
             if error_args:
                 errcode = error.pgcode
                 line, col, val = error_args[0]
-                pos = iterf.header.index(col)
+                try:
+                    pos = iterf.header.index(col)
+                except:
+                    import pdb
+                    pdb.set_trace()
+                    print col, iterf.header
                 line = int(line) - 1
                 row = cur_buf[line]
                 val = row[pos]
@@ -168,7 +173,7 @@ class PGMethods(BaseMethods):
                     bufs.append(cur_buf[line+i:line+i+20])
                 bufs.append(cur_buf[line+i+20:])
                 
-                _log.debug( "error\t%dt%d\t%s\t%s",
+                _log.debug( "error\t%s\t%d\t%s\t%s",
                             errcode, line, col, val )
                 _log.debug( error )
             else:
