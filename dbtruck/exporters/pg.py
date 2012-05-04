@@ -60,6 +60,16 @@ class PGMethods(BaseMethods):
         
 
     def handle_error(self, errcode, col, val, row):
+	"""
+	This method caches the data that caused import errors in memory, and alters the schema
+        to deal with the errors after a threshold number of the same error types have been encountered.
+
+        When the schema is changed to fix an error, the rows that caused the errors are added back 
+        into the queue of rows to import
+
+	errors described on http://www.postgresql.org/docs/8.1/static/errcodes-appendix.html
+	@return list of rows to re-import
+	"""
         key = (errcode, col)
         self.prev_errors[key].append( (val, row) )
 
