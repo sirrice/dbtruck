@@ -18,10 +18,9 @@ if __name__ == '__main__':
     fname, tablename, dbname = args.fname[0], args.tname[0], args.dbname[0]
     
     errfile = file(args.errfile, 'w')
-    
-    pgmethods = PGMethods(tablename, dbname, errfile)
-    rowiter, types = setup(fname, not args.append, pgmethods)
-    import_iterator(rowiter, types, pgmethods)
+
+
+    import_datafiles(fname, not args.append, tablename, dbname, errfile, PGMethods)
     errfile.close()
 
 # potential options
