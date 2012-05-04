@@ -46,14 +46,21 @@ The installation should install an executable called `importmydata.py` into your
 
 Immediate ToDos
 
-* Faster import: lots of datafiles have errors scattered throughout the data, which dramatically
-  slows down bulk inserts. 
-  * Do preliminary filtering for errors
-  * Fall back to (prepared) individual inserts once too many bulk insert attempts fail
+* ~~Faster import: lots of datafiles have errors scattered throughout the data, which dramatically
+  slows down bulk inserts.~~ 
+  * ~~Do preliminary filtering for errors~~
+  * ~~Fall back to (prepared) individual inserts once too many bulk insert attempts fail~~
 * Better error reporting
   * Load failed data into a hidden table in the database
   * Log error reasons
   * Try to recover from typical errors (date column contains a random string) by using reasonable defaults
+* Refactor file iterator objects to keep track of hints identified earlier in the pipeline
+  * for example, parsed json files can infer that the dictionary keys are table headers -- no
+    need to re-infer that later in the pipeline
+  * Include confidence scores for each inference
+* Support extracting multiple tables from each input file
+  * an HTML file may contain multiple tables to be imported
+
 
 ## Comments
 
