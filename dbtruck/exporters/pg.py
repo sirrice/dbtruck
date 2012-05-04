@@ -101,8 +101,7 @@ class PGMethods(BaseMethods):
             if col is None:
                 newrow.append('NULL')
             elif isinstance(col, basestring):
-                enc = unicode(col, errors='ignore')
-                newrow.append(enc.replace('\t', ' '))
+                newrow.append(col.replace('\t', ' '))
             else:
                 newrow.append(str(col).replace('\t', ' '))
         return '\t'.join(newrow)

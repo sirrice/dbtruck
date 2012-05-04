@@ -7,6 +7,8 @@ import math
 import re
 import json
 import codecs
+import zipfile
+import itertools
 
 from operator import and_
 from collections import *
@@ -20,7 +22,7 @@ from dbtruck.parsers.util import _get_reader
 
 
 _log = get_logger()
-
+ZIPDIRNAME = '__dbtruck__unzips__'
 
 
 class Parser(object):
@@ -42,12 +44,12 @@ class CSVFileParser(Parser):
         bestdelim, bestncols = None, 0
         for delim in DELIMITERS:
             consistent, ncols =  rows_consistent(_get_reader(self.f, delim))
-            _log.debug( 'delimiters\t%s\t%st%d', delim, consistent, ncols )
+            _log.debug("csvparser\t'%s'\tconsistent(%s)\tncols(%d)", delim, consistent, ncols )
             if consistent:
                 if ncols > bestncols:
                     bestdelim, bestncols = delim, ncols
         if bestncols:
-            _log.debug( "best delimitor\t%s\t%d", bestdelim, bestncols )
+            _log.debug("csvparser\tbest delim\t'%s'\tncols(%d)", bestdelim, bestncols )
             return DataIterator(lambda: _get_reader(self.f, bestdelim))
         raise "Could not parse using CSV"
 
@@ -82,7 +84,7 @@ class OffsetFileParser(Parser):
         increasing = reduce(and_, ( arr[i+1]>arr[i] for i in xrange(len(arr)-1)) )
         if not increasing:
             arr = map( lambda i: sum(arr[:i]), range(len(arr)) )
-        _log.debug( "normalized offsets: %s", str(arr) )
+        _log.debug( "offsetparser\tnormalized offsets: %s", str(arr) )
         return arr
         
     
@@ -200,12 +202,28 @@ def get_readers(fname, **kwargs):
     """
     # TODO: try testing other file formats
     # json, html etc
-
+    _log.info("processing\t%s", fname)
     if os.path.isdir(fname):
         dataiters = []
         args = {'kwargs' : kwargs, 'dataiters' : dataiters}
         os.path.walk(fname, get_readers_walk_cb, args)
         return dataiters
+    elif zipfile.is_zipfile(fname):
+        with zipfile.ZipFile(fname, 'r') as zp:
+            if not os.path.exists(ZIPDIRNAME):
+                os.mkdir(ZIPDIRNAME)
+            prefix = os.path.join(ZIPDIRNAME, fname)
+            
+            _log.info("unzipping datafiles from %s in", fname)
+            namelist = zp.namelist()
+            namelist = filter(lambda name: (not name.startswith('/')
+                                            and not('..' in name)),
+                                            namelist)
+            zp.extractall(prefix, namelist)
+
+            
+            namelist = map(lambda name: os.path.join(prefix, name), namelist)
+            return itertools.chain(*map(get_readers, namelist))
     return [get_reader_from_text_file(fname, **kwargs)]
 
 def get_readers_walk_cb(args, dirname, fnames):
@@ -220,7 +238,7 @@ def get_readers_walk_cb(args, dirname, fnames):
                 dataiters.append(dataiter)
     
 
-text_parsers = [CSVFileParser, JSONParser, OffsetFileParser]
+text_parsers = [CSVFileParser, JSONParser]
 def get_reader_from_text_file(fname, **kwargs):
     bestiter, bestparser, bestncols = None, None, 1
     for parser in text_parsers:
@@ -235,12 +253,20 @@ def get_reader_from_text_file(fname, **kwargs):
             pass
         except Exception as e:
             _log.info(e)
-    if bestiter:
-        _log.debug("best parser: %s", parser.__name__)
-    else:
-        _log.debug("Could not parse file, defaulting to single column format")        
+    if not bestiter:
+        _log.debug("Checking to see if user has offsets")
+        with file(fname, 'r') as f:
+            p = parser(f, **kwargs)
+            i = p.get_data_iter()
+            consistent, ncols = rows_consistent(i())
+            if consistent and ncols > bestncols:
+                bestiter, bestparser, bestncols = i, parser, ncols
+
+    if not bestiter:
+        _log.debug("Could not parse file. Defaulting to single column format")        
         bestparser = SingleColumnParser
-    print bestparser
+        
+    _log.debug("text file parser: %s\t%s", bestparser.__name__, fname)
     f = file(fname, 'r')
     dataiter = bestparser(f, **kwargs).get_data_iter()
     dataiter.fname = fname

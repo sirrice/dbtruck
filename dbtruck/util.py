@@ -7,25 +7,48 @@ import logging
 class GlobalLogger(object):
     def __init__(self):
         self._logger = None
+        self.formatter = logging.Formatter('%(asctime)s - %(lineno)s - %(levelname)s - %(message)s')
     
-    def __call__(self, fname='./log.txt', flevel=logging.DEBUG, plevel=logging.WARNING):
+    def __call__(self, fname=None, flevel=None, plevel=None):
         if self._logger:
             # set levels
+            if fname:
+                fh = filter(lambda h: h.get_name() == 'filehandler',
+                           self._logger.handlers)[0]
+                self._logger.removeHandler(fh)
+
+                fh = logging.FileHandler(fname)
+                fh.setLevel(logging.DEBUG)
+                fh.setFormatter(self.formatter)
+                fh.set_name('filehandler')
+                self._logger.addHandler(fh)
+                
+            for handler in self._logger.handlers:
+                if plevel and handler.get_name() == 'stdhandler':
+                    handler.setLevel(plevel)
+                if flevel and handler.get_name() == 'filehandler':
+                    handler.setLevel(flevel)
+            self._logger
             return self._logger
 
+        fname = fname or './log.txt'                
+        flevel = flevel or logging.DEBUG
+        plevel = plevel or logging.WARNING
+        
         self._logger = logging.getLogger()
         self._logger.setLevel(logging.DEBUG)
 
-        formatter = logging.Formatter('%(asctime)s - %(lineno)s - %(levelname)s - %(message)s')
 
         fh = logging.FileHandler(fname)
         fh.setLevel(flevel)
-        fh.setFormatter(formatter)
+        fh.setFormatter(self.formatter)
+        fh.set_name('filehandler')
         self._logger.addHandler(fh)
 
         ph = logging.StreamHandler(sys.stdout)
         ph.setLevel(plevel)
-        ph.setFormatter(formatter)
+        ph.setFormatter(self.formatter)
+        ph.set_name('stdhandler')
         self._logger.addHandler(ph)
         return self._logger
 
