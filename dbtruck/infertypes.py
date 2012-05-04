@@ -7,8 +7,10 @@ import math
 # notes: alter table readings alter column time type time using (time::time);
 
 def get_type(val):
+    if not isinstance(val, str):
+        return type(val)
     val = val.strip()
-    if val == '': return None
+    if not val: return None
 
     try:
         i = int(val)
@@ -54,19 +56,22 @@ def validate_type((t, v)):
     return True
 
 def str2sqlval((t, val)):
+    if not isinstance(val, str):
+        return val
     val = val.strip()
-    try:
-        if t == datetime.datetime:
-            d = dateparse(val).strftime('%Y-%m-%d %H:%M:%S')
-            return d
-        if t == datetime.date:
-            d = dateparse(val).strftime('%Y-%m-%d')
-            return d
-        if t == datetime.time:
-            d = dateparse(val).strftime('%H:%M:%S')
-            return d
-    except:
-        pass
+    
+    # try:
+    #     if t == datetime.datetime:
+    #         d = dateparse(val).strftime('%Y-%m-%d %H:%M:%S')
+    #         return d
+    #     if t == datetime.date:
+    #         d = dateparse(val).strftime('%Y-%m-%d')
+    #         return d
+    #     if t == datetime.time:
+    #         d = dateparse(val).strftime('%H:%M:%S')
+    #         return d
+    # except:
+    #     pass
 
     try:
         if t == int:
@@ -77,8 +82,7 @@ def str2sqlval((t, val)):
         return 0
 
     if val == '':
-        return 'NULL'
-    val = val.replace(',', '')
+        return None
     return val
 
 

@@ -1,4 +1,4 @@
-import subprocess, sys, csv, datetime, math, os, logging, re
+import subprocess, sys, csv, datetime, math, os, logging, re, time
 from collections import *
 from dateutil.parser import parse as dateparse
 
@@ -50,17 +50,19 @@ def setup(fname, new, dbmethods):
 
 
 def transform_and_validate(types, row):
-    row = map(str, map(str2sqlval, zip(types, row)))
-    val = map(validate_type, zip(types, row))
+    row = map(str2sqlval, zip(types, row))
+    return row
+    #val = map(validate_type, zip(types, row))
     if reduce(lambda a,b: a and b, val):
         return row
     return None
     
 
 def import_iterator(rowiter, types, dbmethods):
-    blocksize = 10000
+    blocksize = 100000
     buf = []
 
+    start = time.time()
     for rowidx, row in enumerate(rowiter):
         row = transform_and_validate(types, row)
         if row is not None:
@@ -69,9 +71,11 @@ def import_iterator(rowiter, types, dbmethods):
             print >>dbmethods.errfile, ','.join(row)
 
         if len(buf) > 0 and len(buf) % blocksize == 0:
+            print "transform_val\t", (time.time() - start)
             success = dbmethods.import_block(buf)
             _log.info( "loaded\t%s\t%d", success, rowidx )
             buf = []
+            start = time.time()            
 
     if len(buf) > 0:
         success = dbmethods.import_block(buf)
