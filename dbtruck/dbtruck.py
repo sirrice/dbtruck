@@ -11,8 +11,6 @@ import time
 from collections import *
 from dateutil.parser import parse as dateparse
 
-
-
 moduledir = os.path.abspath(os.path.dirname(__file__)) 
 sys.path.append( moduledir )
 from infertypes import *
@@ -47,25 +45,28 @@ def infer_header_row(rowiter, types):
 
     return True
 
+
+def clean_header(value):
+    return re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
+    
+
 def infer_metadata(iterf):
     if not iterf.types:
-        iterf.types = types = infer_col_types(iterf())
+        iterf.types = infer_col_types(iterf())
 
     if not iterf.header:
         rowiter = iterf()
         header = None
-        if infer_header_row(iterf(), types):
+        if infer_header_row(iterf(), iterf.types):
             header = rowiter.next()
             header = map(clean_header, header)
             iterf.header = header
         else:
-            iterf.header = ['attr%d' % i for i in xrange(len(types))]
+            iterf.header = ['attr%d' % i for i in xrange(len(iterf.types))]
             
     _log.info( 'types:\t%s', ' '.join(map(str, iterf.types)) )
     _log.info( 'headers:\t%s', iterf.header and ' '.join(iterf.header) or 'no header found' )
 
-def clean_header(value):
-    return re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
 
 
 def import_datafiles(fname, new, tablename, dbname, errfile, exportmethodsklass):
