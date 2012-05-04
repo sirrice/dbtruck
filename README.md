@@ -54,7 +54,7 @@ Immediate ToDos
   * Load failed data into a hidden table in the database
   * Log error reasons
   * Try to recover from typical errors (date column contains a random string) by using reasonable defaults
-* Refactor file iterator objects to keep track of hints identified earlier in the pipeline
+* ~~Refactor file iterator objects to keep track of hints identified earlier in the pipeline~~
   * for example, parsed json files can infer that the dictionary keys are table headers -- no
     need to re-infer that later in the pipeline
   * Include confidence scores for each inference

@@ -1,3 +1,4 @@
+import os
 import sys
 import csv
 import logging
@@ -101,7 +102,7 @@ class SingleColumnParser(Parser):
     def get_data_iter(self):
         def _f():
             self.f.seek(0)
-            for line in f:
+            for line in self.f:
                 yield [line.strip()]
         return DataIterator(_f)
 
@@ -198,13 +199,29 @@ def get_readers(fname, **kwargs):
     """
     # TODO: try testing other file formats
     # json, html etc
-    
+
+    if os.path.isdir(fname):
+        dataiters = []
+        args = {'kwargs' : kwargs, 'dataiters' : dataiters}
+        os.path.walk(fname, get_readers_walk_cb, args)
+        return dataiters
     return [get_reader_from_text_file(fname, **kwargs)]
 
+def get_readers_walk_cb(args, dirname, fnames):
+    kwargs = args['kwargs']
+    dataiters = args['dataiters']
+    for fname in fnames:
+        fullname = os.path.join(dirname, fname)
+        if not os.path.isdir(fullname):
+            for dataiter in get_readers(fullname, **kwargs):
+                dataiter.fname = fname
+                dataiter.file_index = len(dataiters)
+                dataiters.append(dataiter)
+    
 
 text_parsers = [CSVFileParser, JSONParser, OffsetFileParser]
 def get_reader_from_text_file(fname, **kwargs):
-    bestiter, bestparser, bestncols = None, None, 0
+    bestiter, bestparser, bestncols = None, None, 1
     for parser in text_parsers:
         try:
             with file(fname, 'r') as f:
@@ -220,12 +237,15 @@ def get_reader_from_text_file(fname, **kwargs):
             traceback.print_exc()
     if bestiter:
         _log.debug("best parser: %s", parser.__name__)
-        f = file(fname, 'r')
-        return bestparser(f, **kwargs).get_data_iter()
+    else:
+        _log.debug("Could not parse file, defaulting to single column format")        
+        bestparser = SingleColumnParser
+    print bestparser
+    f = file(fname, 'r')
+    dataiter = bestparser(f, **kwargs).get_data_iter()
+    dataiter.fname = fname
+    return dataiter
 
-    _log.debug("Could not parse file, defaulting to single column format")
-    p = SingleColumnParser(file(fname, 'r'), **kwargs)
-    return p.get_data_iter()
 
 
 if __name__ == '__main__':

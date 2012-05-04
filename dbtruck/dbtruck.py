@@ -36,11 +36,36 @@ def infer_header_row(rowiter, types):
     header = rowiter.next()
     htypes = map(get_type, header)
     matches = sum([ht == t and ht != None and t != str for ht, t in zip(htypes, types)])
-    return matches == 0
+
+    if matches > 0:
+        return False
+
+    if max(map(len, header)) > 50:
+        return False
+
+    # lots of more complex analysis goes HERE
+
+    return True
+
+def infer_metadata(iterf):
+    if not iterf.types:
+        iterf.types = types = infer_col_types(iterf())
+
+    if not iterf.header:
+        rowiter = iterf()
+        header = None
+        if infer_header_row(iterf(), types):
+            header = rowiter.next()
+            header = map(clean_header, header)
+            iterf.header = header
+        else:
+            iterf.header = ['attr%d' % i for i in xrange(len(types))]
+            
+    _log.info( 'types:\t%s', ' '.join(map(str, iterf.types)) )
+    _log.info( 'headers:\t%s', iterf.header and ' '.join(iterf.header) or 'no header found' )
 
 def clean_header(value):
     return re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
-
 
 
 def import_datafiles(fname, new, tablename, dbname, errfile, exportmethodsklass):
@@ -55,25 +80,10 @@ def import_datafiles(fname, new, tablename, dbname, errfile, exportmethodsklass)
 
             infer_metadata(iterf)
             exportmethods.setup_table(iterf.types, iterf.header, new)
-            import_iterator(iterf(), iterf.types, exportmethods)
+            import_iterator(iterf, exportmethods)
         except:
             import traceback
             traceback.print_exc()
-
-
-def infer_metadata(iterf):
-    if not iterf.types:
-        iterf.types = types = infer_col_types(iterf())
-
-    if not iterf.header:
-        rowiter = iterf()
-        header = None
-        if infer_header_row(iterf(), types):
-            header = rowiter.next()
-            header = map(clean_header, header)
-            iterf.header = header
-    _log.info( 'types:\t%s', ' '.join(map(str, iterf.types)) )
-    _log.info( 'headers:\t%s', iterf.header and ' '.join(iterf.header) or 'no header found' )
 
 
 
@@ -86,7 +96,12 @@ def transform_and_validate(types, row):
     return None
     
 
-def import_iterator(rowiter, types, dbmethods):
+def import_iterator(iterf, dbmethods):
+    """
+    """
+    # this function could dynamically increase or decrease the block
+    rowiter = iterf()
+    types = iterf.types
     blocksize = 100000
     buf = []
 
@@ -100,13 +115,13 @@ def import_iterator(rowiter, types, dbmethods):
 
         if len(buf) > 0 and len(buf) % blocksize == 0:
             print "transform_val\t", (time.time() - start)
-            success = dbmethods.import_block(buf)
+            success = dbmethods.import_block(buf, iterf)
             _log.info( "loaded\t%s\t%d", success, rowidx )
             buf = []
             start = time.time()            
 
     if len(buf) > 0:
-        success = dbmethods.import_block(buf)
+        success = dbmethods.import_block(buf, iterf)
     _log.info( "loaded\t%s\t%d", success, rowidx )
 
 

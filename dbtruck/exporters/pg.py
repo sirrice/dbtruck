@@ -42,8 +42,6 @@ class PGMethods(BaseMethods):
 
     def sql_create(self, types, attrs=None, new=True):
         # make up some attribute names
-        if attrs is None:
-            attrs = ['attr%d' % i for i in xrange(len(types))]
         types = map(BaseMethods.type2str, types)
         stmts = []
         if new:
@@ -80,19 +78,23 @@ class PGMethods(BaseMethods):
         elif errcode in ['22003']:
             # 22003: NUMERIC VALUE OUT OF RANGE.  change to bigint
             query = "alter table %s alter %s type %s" % (self.tablename, col, 'bigint') 
+        else:
+            #raise "error code not recogniszed %s" % errcode
+            pass
+
 
         if query:
             cur = self.db.cursor()
             cur.execute(query)
             self.db.commit()
             cur.close()
-            
-            # import the rows related to the error that we just fixed!
-            if self.import_block(rows):
-                del self.prev_errors[key]
-            return True
-        return False
 
+            del self.prev_errors[key]
+
+            # import the rows related to the error that we just fixed!            
+            return rows
+        return None
+            
     def prepare_row_for_copy(self, row):
         newrow = []
         for col in row:
@@ -123,7 +125,7 @@ class PGMethods(BaseMethods):
             self.db.rollback()
         return error
             
-    def import_block(self, buf):
+    def import_block(self, buf, iterf):
         bufs = [buf]
 
         # get rid of the recursion, if possible
@@ -140,8 +142,24 @@ class PGMethods(BaseMethods):
             if error_args:
                 errcode = error.pgcode
                 line, col, val = error_args[0]
+                pos = iterf.header.index(col)
                 line = int(line) - 1
-                self.handle_error(errcode, col, val, cur_buf[line])
+                row = cur_buf[line]
+                val = row[pos]
+                old_err_rows = self.handle_error(errcode,
+                                                 col,
+                                                 val,
+                                                 row)
+                if old_err_rows:
+                    bufs.insert(0, old_err_rows)
+
+                if len(cur_buf) <= 1:
+                    row = cur_buf[0]
+                    print >>self.errfile, ','.join(map(str, row))
+                    print errcode, error
+                    print col
+                    print val
+                    continue
                 bufs.append(cur_buf[:line])
 
                 # usually the next N rows will be bad, so do them
