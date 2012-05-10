@@ -68,3 +68,12 @@ def block_iter(l, nblocks=2):
         yield l[i:i+blocksize]
         i += blocksize      
     
+def to_utf(o):
+    try:
+        return str(o)
+    except:
+        try:
+            return o.encode('utf-8', errors='ignore')
+        except:
+            return str(unicode(o, errors='ignore'))
+    return ''

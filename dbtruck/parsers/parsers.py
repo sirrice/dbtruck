@@ -1,8 +1,11 @@
 import os
 import sys
 import csv
+import pdb
 import logging
 import datetime
+import traceback
+import requests
 import math
 import re
 import json
@@ -13,7 +16,8 @@ import itertools
 from operator import and_
 from collections import *
 from dateutil.parser import parse as dateparse
-from pyquery import PyQuery as pq
+from pyquery import PyQuery
+from StringIO import StringIO
 
 from dataiter import DataIterator
 from ..util import get_logger
@@ -182,17 +186,62 @@ class ExcelParser(Parser):
 
 class HTMLTableParser(Parser):
     """
-    Takes the html of a <table> element and constructs an iterator
+    Takes a <table> element and constructs an 
+
+    looks for tables that are of the form
+    table
+     [tr
+       th*]
+     tr*
+       td*
+
+    the text within each td and th is used as the content of the table
+    assumes that th is always and only used as the table's header
     """
-    def iterator(self):
-        raise
+    def get_data_iter(self):
+        self.f.seek(0)
+        table = PyQuery(self.f.read())
+        ths = table('th')
+        header = [PyQuery(th).text() for th in ths] if ths else None
+
+        trs = table('tr')
+        rows = []
+        for tr_el in trs:
+            tr = PyQuery(tr_el)
+            tds = tr('td')
+            if tds:
+                row = [PyQuery(td).text() for td in tds]
+                rows.append(row)
+        return DataIterator(lambda: iter(rows), header=header)
 
 
+def is_url(fname, **kwargs):
+    if fname.startswith('http://') or fname.startswith('www.'):
+        return True
 
+def is_url_file(fname, **kwargs):
+    try:
+        with file(fname, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                if not is_url(line):
+                    return False
+        return True
+    except:
+        traceback.print_exc()
+        return False
 
-
-
-
+def is_html_file(fname, **kwargs):
+    try:
+        size = os.path.getsize(fname)
+        if size > 1048576 * 4:
+            return False
+        with file(fname, 'r') as f:
+            return len(PyQuery(f.read())('table')) > 0
+    except:
+        return False
 
 
 def get_readers(fname, **kwargs):
@@ -203,7 +252,12 @@ def get_readers(fname, **kwargs):
     # TODO: try testing other file formats
     # json, html etc
     _log.info("processing\t%s", fname)
-    if os.path.isdir(fname):
+
+    if is_url(fname):
+        return get_readers_from_url(fname)
+    elif is_url_file(fname):
+        return get_readers_from_url_file(fname, **kwargs)
+    elif os.path.isdir(fname):
         dataiters = []
         args = {'kwargs' : kwargs, 'dataiters' : dataiters}
         os.path.walk(fname, get_readers_walk_cb, args)
@@ -224,9 +278,14 @@ def get_readers(fname, **kwargs):
             
             namelist = map(lambda name: os.path.join(prefix, name), namelist)
             return itertools.chain(*map(get_readers, namelist))
-    return [get_reader_from_text_file(fname, **kwargs)]
+    elif is_html_file(fname):
+        return get_readers_from_html_file(fname, **kwargs)
+    return get_readers_from_text_file(fname, **kwargs)
 
 def get_readers_walk_cb(args, dirname, fnames):
+    """
+    talkback for directory walk
+    """
     kwargs = args['kwargs']
     dataiters = args['dataiters']
     for fname in fnames:
@@ -236,10 +295,12 @@ def get_readers_walk_cb(args, dirname, fnames):
                 dataiter.fname = fname
                 dataiter.file_index = len(dataiters)
                 dataiters.append(dataiter)
+
+
     
 
 text_parsers = [CSVFileParser, JSONParser]
-def get_reader_from_text_file(fname, **kwargs):
+def get_readers_from_text_file(fname, **kwargs):
     bestiter, bestparser, bestncols = None, None, 1
     for parser in text_parsers:
         try:
@@ -270,8 +331,77 @@ def get_reader_from_text_file(fname, **kwargs):
     f = file(fname, 'r')
     dataiter = bestparser(f, **kwargs).get_data_iter()
     dataiter.fname = fname
-    return dataiter
+    return [dataiter]
 
+
+def find_ideal_tables(tables):
+    rm = []
+    for table in tables:
+        found = False        
+        for t2 in tables:
+            if table == t2:
+                continue
+            t2 = PyQuery(t2)
+            _t = PyQuery(table)
+            while len(_t):
+                if _t == t2:
+                    found = True
+                    break
+                _t = _t.parent()
+        if found:
+            rm.append(table)
+    ret = [table for table in tables if table not in rm]
+    return ret
+
+def get_readers_from_html_content(html, **kwargs):
+    parsers = []
+    pq = PyQuery(html)
+    tables = find_ideal_tables(pq('table'))
+    
+    for table_el in tables:
+        try:
+            table = PyQuery(table_el)
+            p = HTMLTableParser(StringIO(table.html()), **kwargs)
+            i = p.get_data_iter()
+            consistent, ncols = html_rows_consistent(i())
+            if consistent and ncols > 1:
+                parsers.append(i)
+        except KeyboardInterrupt:
+            pass
+        except Exception as e:
+            traceback.print_exc()
+            _log.info(e)
+    return parsers
+
+def get_readers_from_html_file(fname, **kwargs):
+    try:
+        with file(fname, 'r') as f:
+            return get_readers_from_html_content(f.read(), **kwargs)
+    except:
+        traceback.print_exc()        
+        return []
+
+def get_readers_from_url(url, **kwargs):
+    try:
+        _log.debug("fetching url %s", url)
+        req = requests.get(url)
+        return get_readers_from_html_content(req.content, **kwargs)
+    except:
+        traceback.print_exc()
+        return []
+
+def get_readers_from_url_file(fname, **kwargs):
+    try:
+        with file(fname, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                for reader in get_readers(line, **kwargs):
+                    yield reader
+    except:
+        traceback.print_exc()
+        
 
 
 if __name__ == '__main__':

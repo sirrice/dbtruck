@@ -87,14 +87,27 @@ def str2sqlval((t, val)):
 
 
 
-def infer_col_types(rowiter):
+def infer_col_types(iterf):
     """
     @return a list of the most common type for each column
     """
-    rowiter.next()
-    linenum = 0
-    types = [Counter() for j in xrange(max([len(rowiter.next()) for i in xrange(10)]))]
+    # infer best row length
+    if iterf.header:
+        types = [Counter() for j in xrange(len(iterf.header))]
+    else:
+        rowiter = iterf()
+        rowiter.next()
+        counter = Counter(len(rowiter.next()) for i in xrange(1000))
+        bestrowlen = counter.most_common(1)[0][0]
+        types = [Counter() for j in xrange(bestrowlen)]
+
+
+    rowiter = iterf()
+    linenum = 0        
     for row in rowiter:
+        if len(row) != len(types):
+            continue
+        
         for key, val in enumerate(row):
             t = get_type(val)
             if t is not None: 

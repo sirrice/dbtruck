@@ -7,6 +7,7 @@ import os
 import logging
 import re
 import time
+import pdb
 
 from collections import *
 from dateutil.parser import parse as dateparse
@@ -15,7 +16,7 @@ moduledir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append( moduledir )
 from infertypes import *
 from parsers.parsers import *
-from util import get_logger
+from util import get_logger, to_utf
 
 
 _log = get_logger()
@@ -53,25 +54,31 @@ def clean_header(value):
 
 def infer_metadata(iterf):
     if not iterf.types:
-        iterf.types = infer_col_types(iterf())
+        iterf.types = infer_col_types(iterf)
 
     if not iterf.header:
         rowiter = iterf()
         header = None
         if infer_header_row(iterf(), iterf.types):
             header = rowiter.next()
-            header = map(clean_header, header)
             iterf.header = header
         else:
             iterf.header = ['attr%d' % i for i in xrange(len(iterf.types))]
+
+    iterf.header = map(clean_header, iterf.header)
+
             
     _log.info( 'types:\t%s', ' '.join(map(str, iterf.types)) )
     _log.info( 'headers:\t%s', iterf.header and ' '.join(iterf.header) or 'no header found' )
 
 
+def get_readers_from_list(fnames):
+    for fname in fnames:
+        for reader in get_readers(fname):
+            yield reader
 
-def import_datafiles(fname, new, tablename, dbname, errfile, exportmethodsklass):
-    for idx, iterf in enumerate(get_readers(fname)):
+def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass):
+    for idx, iterf in enumerate(get_readers_from_list(fnames)):
         try:
             if idx > 0:
                 newtablename = '%s_%d' % (tablename, idx)            
@@ -90,7 +97,7 @@ def import_datafiles(fname, new, tablename, dbname, errfile, exportmethodsklass)
 
 
 def transform_and_validate(types, row):
-    row = map(str2sqlval, zip(types, row))
+    #row = map(str2sqlval, zip(types, row))
     return row
     #val = map(validate_type, zip(types, row))
     if reduce(lambda a,b: a and b, val):
@@ -107,21 +114,17 @@ def import_iterator(iterf, dbmethods):
     blocksize = 100000
     buf = []
 
-    start = time.time()
     for rowidx, row in enumerate(rowiter):
         row = transform_and_validate(types, row)
-        if row is not None:
+
+        if row is not None and len(row) == len(iterf.types):
             buf.append(row)
-        else:
-            print >>dbmethods.errfile, ','.join(row)
+        elif row is not None and len(row) != len(iterf.types):
+            print >>dbmethods.errfile, ','.join(map(to_utf, row))
 
         if len(buf) > 0 and len(buf) % blocksize == 0:
-            print "transform_val\t", (time.time() - start)
             success = dbmethods.import_block(buf, iterf)
-            _log.info( "loaded\t%s\t%d", success, rowidx )
             buf = []
-            start = time.time()
-            break
 
     if len(buf) > 0:
         success = dbmethods.import_block(buf, iterf)

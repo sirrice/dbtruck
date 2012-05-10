@@ -7,6 +7,7 @@ import os
 import logging
 import time
 import re
+import pdb
 
 sys.path.append('..')
 sys.path.append( os.path.abspath(os.path.dirname(__file__)) )
@@ -15,7 +16,7 @@ from collections import *
 from dateutil.parser import parse as dateparse
 from StringIO import StringIO
 
-from ..util import get_logger
+from ..util import get_logger, to_utf
 from util import block_iter
 from infertypes import *
 from db import connect
@@ -37,7 +38,7 @@ class PGMethods(BaseMethods):
         self.types = []
 
         self.prev_errors = defaultdict(list)
-        self.threshold = 20
+        self.threshold = 10
         
 
     def sql_create(self, types, attrs=None, new=True):
@@ -60,37 +61,36 @@ class PGMethods(BaseMethods):
         
 
     def handle_error(self, errcode, col, val, row):
-	"""
-	This method caches the data that caused import errors in memory, and alters the schema
-        to deal with the errors after a threshold number of the same error types have been encountered.
+        """
+        This method caches the data that caused import errors in memory, and alters the schema
+            to deal with the errors after a threshold number of the same error types have been encountered.
 
-        When the schema is changed to fix an error, the rows that caused the errors are added back 
-        into the queue of rows to import
+            When the schema is changed to fix an error, the rows that caused the errors are added back 
+            into the queue of rows to import
 
-	errors described on http://www.postgresql.org/docs/8.1/static/errcodes-appendix.html
-	@return list of rows to re-import
-	"""
+        errors described on http://www.postgresql.org/docs/8.1/static/errcodes-appendix.html
+        @return list of rows to re-import
+        """
         key = (errcode, col)
         self.prev_errors[key].append( (val, row) )
 
         if len(self.prev_errors[key]) < self.threshold:
             return False
 
+        _log.info("handling error\t%s", key)
         vals, rows = zip(*self.prev_errors[key])            
         query = None
-        if errcode in ['22001', '22007']:
+        if errcode in ['22003']:
+            # 22003: NUMERIC VALUE OUT OF RANGE.  change to bigint
+            query = "alter table %s alter %s type %s" % (self.tablename, col, 'bigint')
+        #if errcode in ['22001', '22007', '22P02']:
+        else:
             # 22001: make column size longer
             # 22007: change column into varchar
             newlen = max(map(len, vals)) * 2
-            newlen = max(newlen, 128)
             newtype = 'varchar(%d)' % newlen if newlen <= 1024 else 'text'
             query = "alter table %s alter %s type %s" % (self.tablename, col, newtype)
-        elif errcode in ['22003']:
-            # 22003: NUMERIC VALUE OUT OF RANGE.  change to bigint
-            query = "alter table %s alter %s type %s" % (self.tablename, col, 'bigint') 
-        else:
-            #raise "error code not recogniszed %s" % errcode
-            pass
+
 
 
         if query:
@@ -154,7 +154,6 @@ class PGMethods(BaseMethods):
                 try:
                     pos = iterf.header.index(col)
                 except:
-                    import pdb
                     pdb.set_trace()
                     print col, iterf.header
                 line = int(line) - 1
@@ -169,10 +168,12 @@ class PGMethods(BaseMethods):
 
                 if len(cur_buf) <= 1:
                     row = cur_buf[0]
-                    print >>self.errfile, ','.join(map(str, row))
-                    print errcode, error
-                    print col
-                    print val
+                    normrow = map(to_utf, row)
+                    print >>self.errfile, ','.join(normrow)
+                    # print row
+                    # print errcode, error
+                    # print col
+                    # print val
                     continue
                 bufs.append(cur_buf[:line])
 
@@ -187,16 +188,15 @@ class PGMethods(BaseMethods):
                 _log.debug( error )
             else:
                 # default to recursively trying 
-                print "couldn't parse error in ", str(error)
+                _log.warn("couldn't parse error in '%s'\t%s", str(error), error.pgcode)
                 if len(cur_buf) > 10:
                     map(bufs.append, block_iter(cur_buf, 10))
                 elif len(cur_buf) > 1:
                     map(self.import_row, cur_buf)
                 else:
                     row = cur_buf[0]
-                    print >>self.errfile, ','.join(map(str, row))
-                    print error
-                    print row
+                    normrow = map(to_utf, row)
+                    print >>self.errfile, ','.join(normrow)
 
         return True
 
@@ -213,9 +213,9 @@ class PGMethods(BaseMethods):
         except Exception as e:
             error = e
             self.db.rollback()
-            print >>self.errfile, ','.join(map(str, row))
-            print e
-            print row
+            normrow = map(to_utf, row)
+            print >>self.errfile, ','.join(normrow)
+            _log.warn("import row error\t%s", e)
             return error
 
 
