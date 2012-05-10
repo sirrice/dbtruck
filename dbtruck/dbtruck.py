@@ -1,4 +1,3 @@
-import subprocess
 import sys
 import csv
 import datetime
@@ -25,11 +24,6 @@ re_nonascii = re.compile('[^\w\s]')
 re_nonasciistart = re.compile('^[^\w]')
 
 
-def wc(fname):
-    p = subprocess.Popen(['wc', '-l', fname], stdout=subprocess.PIPE)
-    l = p.stdout.readline().strip()
-    return int(l.split()[0])
-
 
 def infer_header_row(rowiter, types):
     header = rowiter.next()
@@ -47,25 +41,41 @@ def infer_header_row(rowiter, types):
     return True
 
 
-def clean_header(value):
-    ret = re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
-    ret = str(unicode(ret, errors='ignore'))
-    return ret.lower()
+def clean_header(header):
+    newheader = []
+    for value in header:
+        try:
+            ret = re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
+            ret = to_utf(ret)
+        except:
+            print value
+            raise
+        newheader.append(ret.lower())
+
+    # XXX: ensure that header doesn't have overlapping values
+    if len(set(newheader)) < len(newheader):
+        raise Exception, "duplicate elements in header\t%s" % str(newheader)
+    return newheader
+    
 
 def infer_metadata(iterf):
+    """
+    infers header and attribute type information
+    augments iterator (iterf) with type and header arrays
+    """
     if not iterf.types:
         iterf.types = infer_col_types(iterf)
 
-    if not iterf.header:
-        rowiter = iterf()
-        header = None
-        if infer_header_row(iterf(), iterf.types):
-            header = rowiter.next()
-            iterf.header = header
-        else:
-            iterf.header = ['attr%d' % i for i in xrange(len(iterf.types))]
+    if not iterf.header and infer_header_row(iterf(), iterf.types):
+        iterf.header = iterf().next()
 
-    iterf.header = map(clean_header, iterf.header)
+    if iterf.header:
+        iterf.header = clean_header(iterf.header)
+
+    if not iterf.header:
+        iterf.header = ['attr%d' % i for i in xrange(len(iterf.types))]
+
+
 
             
     _log.info( 'types:\t%s', ' '.join(map(str, iterf.types)) )
@@ -78,21 +88,22 @@ def get_readers_from_list(fnames):
             yield reader
 
 def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass):
-    for idx, iterf in enumerate(get_readers_from_list(fnames)):
+    idx = 0
+    for iterf in get_readers_from_list(fnames):
         try:
             if idx > 0:
                 newtablename = '%s_%d' % (tablename, idx)            
             else:
                 newtablename = tablename
 
-            exportmethods = exportmethodsklass(newtablename, dbname, errfile)
-
             infer_metadata(iterf)
+            
+            exportmethods = exportmethodsklass(newtablename, dbname, errfile)
             exportmethods.setup_table(iterf.types, iterf.header, new)
             import_iterator(iterf, exportmethods)
-        except:
-            import traceback
-            traceback.print_exc()
+            idx += 1 # this is so failed tables can be reused
+        except Exception as e:
+            _log.warn(traceback.format_exc())
 
 
 
@@ -123,11 +134,18 @@ def import_iterator(iterf, dbmethods):
             print >>dbmethods.errfile, ','.join(map(to_utf, row))
 
         if len(buf) > 0 and len(buf) % blocksize == 0:
-            success = dbmethods.import_block(buf, iterf)
+            try:
+                success = dbmethods.import_block(buf, iterf)
+            except Exception as e:
+                _log.warn("import_block failed\t%s", e)
             buf = []
 
     if len(buf) > 0:
-        success = dbmethods.import_block(buf, iterf)
-    _log.info( "loaded\t%s\t%d", success, rowidx )
+        try:
+            success = dbmethods.import_block(buf, iterf)
+            _log.info( "loaded\t%s\t%d", success, rowidx )
+        except Exception as e:
+            _log.warn("import_block failed\t%s", e)
+        
 
 

@@ -4,6 +4,7 @@ import logging
 from dbtruck.dbtruck import *
 from dbtruck.util import get_logger
 from dbtruck.exporters.pg import PGMethods
+from dbtruck.exporters.csvmethods import CSVMethods
 
 if __name__ == '__main__':
     import argparse

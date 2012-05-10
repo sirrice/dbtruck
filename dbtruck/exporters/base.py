@@ -7,19 +7,18 @@ class BaseMethods(object):
         self.dbname = dbname
         self.errfile = errfile
 
-    def sql_create(self, types, attrs=None):
+    def setup_table(self, types, header, new=False):
         raise
 
-    def setup_table(self, types, header):
-        raise
-
-    def import_block(self, buf):
+    def import_block(self, buf, iterf):
         raise 
 
     def import_row(self, row):
         raise
 
-
+    def close(self):
+        pass
+    
     @staticmethod
     def type2str(t):
         if t == datetime.datetime:
@@ -32,4 +31,4 @@ class BaseMethods(object):
             return 'int'
         if t == float:
             return 'float'
-        return 'varchar(100)'
+        return 'varchar(128)'

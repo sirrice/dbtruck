@@ -23,44 +23,43 @@ from dataiter import DataIterator
 from ..util import get_logger
 from util import *
 from dbtruck.parsers.util import _get_reader
+from ..settings import ZIPDIRNAME, DLDIRNAME
 
 
 _log = get_logger()
-ZIPDIRNAME = '__dbtruck__unzips__'
 
 
 class Parser(object):
-    def __init__(self, f, **kwargs):
+    def __init__(self, f, fname, **kwargs):
         self.f = f
+        self.fname = fname
 
     def get_data_iter(self):
         raise "Not implemented"
 
 
 class CSVFileParser(Parser):
-    def __init__(self, f, **kwargs):
-        super(CSVFileParser, self).__init__(f, **kwargs)
-
     def get_data_iter(self):
         # CSV/delimiter based lines
         # return a function that returns iter
-        DELIMITERS = [None, ',', ';', '\t', ' ']
-        bestdelim, bestncols = None, 0
+
+        DELIMITERS = [' ', ',', ';', '\t', '-', ' - ', '=', ' = ']
+        bestdelim, bestperc, bestncols = None, 0., 0
         for delim in DELIMITERS:
-            consistent, ncols =  rows_consistent(_get_reader(self.f, delim))
-            _log.debug("csvparser\t'%s'\tconsistent(%s)\tncols(%d)", delim, consistent, ncols )
-            if consistent:
-                if ncols > bestncols:
-                    bestdelim, bestncols = delim, ncols
+            perc_maj, ncols =  rows_consistent(_get_reader(self.f, delim))
+            _log.debug("csvparser\t'%s'\tperc(%.3f)\tncols(%d)", delim, perc_maj, ncols )
+            if ((ncols <= bestncols and perc_maj > 1.5 * bestperc) or
+                (ncols > bestncols and bestperc - perc_maj < 0.1)):                
+                bestdelim, bestperc, bestncols = delim, perc_maj, ncols
         if bestncols:
             _log.debug("csvparser\tbest delim\t'%s'\tncols(%d)", bestdelim, bestncols )
-            return DataIterator(lambda: _get_reader(self.f, bestdelim))
+            return DataIterator(lambda: _get_reader(self.f, bestdelim), fname=self.fname)
         raise "Could not parse using CSV"
 
 class OffsetFileParser(Parser):
-    def __init__(self, f, **kwargs):
+    def __init__(self, f, fname, **kwargs):
         if 'offset' not in kwargs:
-            s = raw_input('can you give me the offsets to split each row?\n> ').strip()
+            s = raw_input('can you give me the offsets to split each row? (otherwise, just press <enter>)\n> ').strip()
             offsets = self.parse_offset_str(s)
             if not offsets:
                 raise RuntimeError
@@ -68,7 +67,7 @@ class OffsetFileParser(Parser):
             offsets = kwargs['offset']
             
         self.offsets = self.normalize_offsets(offsets)
-        super(OffsetFileParser, self).__init__(f, **kwargs)
+        super(OffsetFileParser, self).__init__(f, fname, **kwargs)
 
     def parse_offset_str(self, s):
         if not s:
@@ -100,18 +99,15 @@ class OffsetFileParser(Parser):
                 line = line.strip()
                 arr = [line[s:e] if s < len(line) else '' for s,e in offpairs]
                 yield arr
-        return DataIterator(_f)
+        return DataIterator(_f, fname=self.fname)
 
 class SingleColumnParser(Parser):
-    def __init__(self, f, **kwargs):
-        super(SingleColumnParser, self).__init__(f, **kwargs)
-
     def get_data_iter(self):
         def _f():
             self.f.seek(0)
             for line in self.f:
                 yield [line.strip()]
-        return DataIterator(_f)
+        return DataIterator(_f, fname=self.fname)
 
 
 class JSONParser(Parser):
@@ -144,7 +140,7 @@ class JSONParser(Parser):
         def _f():
             for d in l:
                 yield [d.get(key, '')  for key in keys]
-        return DataIterator(_f, header=keys)
+        return DataIterator(_f, header=keys, fname=self.fname)
 
     def get_data_iter(self):
         """This methad assumes that JSON file is either
@@ -178,7 +174,7 @@ class JSONParser(Parser):
         if isinstance(bestlist[0], dict):
             return self.list_of_dict_iterator(bestlist)
         elif isinstance(best_list[0], list):
-            return DataIterator(lambda: bestlist)
+            return DataIterator(lambda: bestlist, fname=self.fname)
         raise
 
 class ExcelParser(Parser):
@@ -212,36 +208,8 @@ class HTMLTableParser(Parser):
             if tds:
                 row = [PyQuery(td).text() for td in tds]
                 rows.append(row)
-        return DataIterator(lambda: iter(rows), header=header)
+        return DataIterator(lambda: iter(rows), header=header, fname=self.fname)
 
-
-def is_url(fname, **kwargs):
-    if fname.startswith('http://') or fname.startswith('www.'):
-        return True
-
-def is_url_file(fname, **kwargs):
-    try:
-        with file(fname, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                if not is_url(line):
-                    return False
-        return True
-    except:
-        traceback.print_exc()
-        return False
-
-def is_html_file(fname, **kwargs):
-    try:
-        size = os.path.getsize(fname)
-        if size > 1048576 * 4:
-            return False
-        with file(fname, 'r') as f:
-            return len(PyQuery(f.read())('table')) > 0
-    except:
-        return False
 
 
 def get_readers(fname, **kwargs):
@@ -249,8 +217,8 @@ def get_readers(fname, **kwargs):
     @return a list of functions that return row iterators.  This is so files such as HTML
     can return multiple tables to be stored
     """
-    # TODO: try testing other file formats
-    # json, html etc
+    # XXX: skip binary files that are not supported
+    #      http://www.garykessler.net/library/file_sigs.html
     _log.info("processing\t%s", fname)
 
     if is_url(fname):
@@ -263,21 +231,7 @@ def get_readers(fname, **kwargs):
         os.path.walk(fname, get_readers_walk_cb, args)
         return dataiters
     elif zipfile.is_zipfile(fname):
-        with zipfile.ZipFile(fname, 'r') as zp:
-            if not os.path.exists(ZIPDIRNAME):
-                os.mkdir(ZIPDIRNAME)
-            prefix = os.path.join(ZIPDIRNAME, fname)
-            
-            _log.info("unzipping datafiles from %s in", fname)
-            namelist = zp.namelist()
-            namelist = filter(lambda name: (not name.startswith('/')
-                                            and not('..' in name)),
-                                            namelist)
-            zp.extractall(prefix, namelist)
-
-            
-            namelist = map(lambda name: os.path.join(prefix, name), namelist)
-            return itertools.chain(*map(get_readers, namelist))
+        return get_readers_from_zip_file(fname, **kwargs)
     elif is_html_file(fname):
         return get_readers_from_html_file(fname, **kwargs)
     return get_readers_from_text_file(fname, **kwargs)
@@ -301,35 +255,37 @@ def get_readers_walk_cb(args, dirname, fnames):
 
 text_parsers = [CSVFileParser, JSONParser]
 def get_readers_from_text_file(fname, **kwargs):
-    bestiter, bestparser, bestncols = None, None, 1
+    bestparser, bestperc, bestncols = None, 0., 1
     for parser in text_parsers:
         try:
             with file(fname, 'r') as f:
-                p = parser(f, **kwargs)
+                p = parser(f, fname, **kwargs)
                 i = p.get_data_iter()
-                consistent, ncols = rows_consistent(i())
-                if consistent and ncols > bestncols:
-                    bestiter, bestparser, bestncols = i, parser, ncols
+                perc_maj, ncols = rows_consistent(i())
+                if perc_maj > bestperc and perc_maj > 0.6 and ncols > bestncols:
+                    bestparser, bestperc, bestncols = parser, perc_maj, ncols
         except KeyboardInterrupt:
             pass
         except Exception as e:
             _log.info(e)
-    if not bestiter:
-        _log.debug("Checking to see if user has offsets")
-        with file(fname, 'r') as f:
-            p = parser(f, **kwargs)
-            i = p.get_data_iter()
-            consistent, ncols = rows_consistent(i())
-            if consistent and ncols > bestncols:
-                bestiter, bestparser, bestncols = i, parser, ncols
 
-    if not bestiter:
+    if not bestparser:
+        _log.debug("Checking to see if user has offsets")
+        try:
+            with file(fname, 'r') as f:
+                p = OffsetFileParser(f, fname, **kwargs)
+                i = p.get_data_iter()
+                bestparser, bestncols = parser, ncols
+        except:
+            pass
+
+    if not bestparser:
         _log.debug("Could not parse file. Defaulting to single column format")        
         bestparser = SingleColumnParser
         
     _log.debug("text file parser: %s\t%s", bestparser.__name__, fname)
     f = file(fname, 'r')
-    dataiter = bestparser(f, **kwargs).get_data_iter()
+    dataiter = bestparser(f, fname, **kwargs).get_data_iter()
     dataiter.fname = fname
     return [dataiter]
 
@@ -353,7 +309,7 @@ def find_ideal_tables(tables):
     ret = [table for table in tables if table not in rm]
     return ret
 
-def get_readers_from_html_content(html, **kwargs):
+def get_readers_from_html_content(fname, html, **kwargs):
     parsers = []
     pq = PyQuery(html)
     tables = find_ideal_tables(pq('table'))
@@ -361,7 +317,7 @@ def get_readers_from_html_content(html, **kwargs):
     for table_el in tables:
         try:
             table = PyQuery(table_el)
-            p = HTMLTableParser(StringIO(table.html()), **kwargs)
+            p = HTMLTableParser(StringIO(table.html()), fname, **kwargs)
             i = p.get_data_iter()
             consistent, ncols = html_rows_consistent(i())
             if consistent and ncols > 1:
@@ -369,25 +325,29 @@ def get_readers_from_html_content(html, **kwargs):
         except KeyboardInterrupt:
             pass
         except Exception as e:
-            traceback.print_exc()
-            _log.info(e)
+            _log.info(traceback.format_exc())
     return parsers
 
 def get_readers_from_html_file(fname, **kwargs):
     try:
         with file(fname, 'r') as f:
-            return get_readers_from_html_content(f.read(), **kwargs)
+            return get_readers_from_html_content(fname, f.read(), **kwargs)
     except:
-        traceback.print_exc()        
+        _log.info(traceback.format_exc())
         return []
 
 def get_readers_from_url(url, **kwargs):
     try:
         _log.debug("fetching url %s", url)
+        if not os.path.exists(DLDIRNAME):
+            os.mkdir(DLDIRNAME)
         req = requests.get(url)
-        return get_readers_from_html_content(req.content, **kwargs)
+        fname = os.path.join(DLDIRNAME, url.replace('/', '_'))
+        with file(fname, 'w') as f:
+            f.write(req.content)
+        return get_readers(fname, **kwargs)
     except:
-        traceback.print_exc()
+        _log.info(traceback.format_exc())
         return []
 
 def get_readers_from_url_file(fname, **kwargs):
@@ -400,10 +360,28 @@ def get_readers_from_url_file(fname, **kwargs):
                 for reader in get_readers(line, **kwargs):
                     yield reader
     except:
-        traceback.print_exc()
+        _log.info(traceback.format_exc())
         
+def get_readers_from_zip_file(fname, **kwargs):
+    try:
+        with zipfile.ZipFile(fname, 'r') as zp:
+            if not os.path.exists(ZIPDIRNAME):
+                os.mkdir(ZIPDIRNAME)
+            prefix = os.path.join(ZIPDIRNAME, fname)
+
+            _log.info("unzipping datafiles from %s in", fname)
+            namelist = zp.namelist()
+            namelist = filter(lambda name: (not name.startswith('/')
+                                            and not('..' in name)),
+                                            namelist)
+            zp.extractall(prefix, namelist)
 
 
+            namelist = map(lambda name: os.path.join(prefix, name), namelist)
+            return itertools.chain(*map(get_readers, namelist))
+    except Exception as e:
+        _log.info('get_from_zip_file\t%s', e)
+        return []
 if __name__ == '__main__':
 
     fname = '/Users/sirrice/Desktop/lastpermissiondenied.json'

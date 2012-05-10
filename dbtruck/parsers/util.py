@@ -1,3 +1,4 @@
+import os
 import sys
 import csv
 import logging
@@ -5,9 +6,11 @@ import datetime
 import math
 import re
 import pdb
+import traceback
 
 from operator import and_
 from collections import *
+from pyquery import PyQuery
 from dateutil.parser import parse as dateparse
 
 from ..util import get_logger
@@ -21,6 +24,7 @@ def rows_consistent(iter):
         return False, 0
     maj = lens.most_common(1)[0][1]
     tot = sum(lens.values())
+    return float(maj) / tot, lens.most_common(1)[0][0]
     return float(maj)/tot >= 0.98, lens.most_common(1)[0][0]
 
 def html_rows_consistent(iter):
@@ -48,8 +52,8 @@ def get_row_counts(iter):
             if idx > 10000: break
         return lens
     except:
-        import traceback
-        traceback.print_exc()
+
+        _log.info(traceback.format_exc())
         print "Iteration ended at row %d" % (idx+1)
 
 
@@ -61,8 +65,10 @@ def _get_reader(f, delim):
     f = (line.strip() for line in f)
     if delim is None:
         reader = csv.reader(f)
-    else:
+    elif len(delim) == 1:
         reader = csv.reader(f, delimiter=delim)
+    else:
+        reader = (r.split(delim) for r in f)
 
     try:
         while True:
@@ -71,7 +77,7 @@ def _get_reader(f, delim):
             except StopIteration:
                 break
             except Exception as e:
-                _log.error(str(e))
+                _log.info(traceback.format_exc())                
     except:
         pass
 
@@ -93,7 +99,7 @@ def is_url_file(fname, **kwargs):
                     return False
         return True
     except:
-        traceback.print_exc()
+        _log.info(traceback.format_exc())
         return False
 
 def is_html_file(fname, **kwargs):

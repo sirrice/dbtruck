@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import datetime
 import math
@@ -77,3 +78,11 @@ def to_utf(o):
         except:
             return str(unicode(o, errors='ignore'))
     return ''
+
+
+
+def wc(fname):
+    p = subprocess.Popen(['wc', '-l', fname], stdout=subprocess.PIPE)
+    l = p.stdout.readline().strip()
+    return int(l.split()[0])
+

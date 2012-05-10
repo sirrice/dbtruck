@@ -83,14 +83,13 @@ class PGMethods(BaseMethods):
         if errcode in ['22003']:
             # 22003: NUMERIC VALUE OUT OF RANGE.  change to bigint
             query = "alter table %s alter %s type %s" % (self.tablename, col, 'bigint')
-        #if errcode in ['22001', '22007', '22P02']:
         else:
             # 22001: make column size longer
             # 22007: change column into varchar
+            # 22P02: integer column but got string
             newlen = max(map(len, vals)) * 2
             newtype = 'varchar(%d)' % newlen if newlen <= 1024 else 'text'
             query = "alter table %s alter %s type %s" % (self.tablename, col, newtype)
-
 
 
         if query:
@@ -100,7 +99,6 @@ class PGMethods(BaseMethods):
             cur.close()
 
             del self.prev_errors[key]
-
             # import the rows related to the error that we just fixed!            
             return rows
         return None
