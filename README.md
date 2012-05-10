@@ -58,8 +58,10 @@ Immediate ToDos
   * for example, parsed json files can infer that the dictionary keys are table headers -- no
     need to re-infer that later in the pipeline
   * Include confidence scores for each inference
-* Support extracting multiple tables from each input file
+* ~~Support extracting multiple tables from each input file~~
   * an HTML file may contain multiple tables to be imported
+* ~~Support downloading URLS and HTML files~~
+* ~~Support CSV output~~
 
 
 ## Comments
