@@ -14,13 +14,28 @@ class CSVMethods(BaseMethods):
         self.writer = csv.DictWriter(self.outfile, header)
         self.header = header
 
+    def prepare_row_for_copy(self, row):
+        newrow = []
+        for col in row:
+            if col is None:
+                newrow.append(None)
+            elif isinstance(col, basestring):
+                newrow.append(col.encode('utf-8', errors='ignore'))
+            else:
+                newrow.append(str(col))
+        return self.row_to_dict(newrow)
+
+    def row_to_dict(self, row):
+        return dict(zip(self.header, row))
+
+
     def import_block(self, buf, iterf):
-        dicts = (dict(zip(self.header, row)) for row in buf)
+        dicts = (self.prepare_row_for_copy(row) for row in buf)
         self.writer.writerows(dicts)
 
     def import_row(self, row):
         try:
-            self.writer.writerow(dict(zip(self.header, row)))
+            self.writer.writerow(self.prepare_row_for_copy(row))
         except:
             print row
 

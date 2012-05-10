@@ -137,7 +137,7 @@ def import_iterator(iterf, dbmethods):
             try:
                 success = dbmethods.import_block(buf, iterf)
             except Exception as e:
-                _log.warn("import_block failed\t%s", e)
+                _log.warn(traceback.format_exc())
             buf = []
 
     if len(buf) > 0:
@@ -145,7 +145,7 @@ def import_iterator(iterf, dbmethods):
             success = dbmethods.import_block(buf, iterf)
             _log.info( "loaded\t%s\t%d", success, rowidx )
         except Exception as e:
-            _log.warn("import_block failed\t%s", e)
+            _log.warn(traceback.format_exc())
         
 
 
