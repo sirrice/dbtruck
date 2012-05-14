@@ -129,6 +129,7 @@ def import_iterator(iterf, dbmethods):
     buf = []
 
     for rowidx, row in enumerate(rowiter):
+
         row = transform_and_validate(types, row)
 
         if row is not None and len(row) == len(iterf.types):

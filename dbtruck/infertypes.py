@@ -10,7 +10,7 @@ from dateutil.parser import parse as dateparse
 
 # notes: alter table readings alter column time type time using (time::time);
 
-re_null_chars = re.compile('[\*-_\.\?]+')
+re_null_chars = re.compile('[\*\.\?-_]+')
 
 def get_type(val):
     if not isinstance(val, basestring):
