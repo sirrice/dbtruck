@@ -17,6 +17,7 @@ from operator import and_
 from collections import *
 from dateutil.parser import parse as dateparse
 from pyquery import PyQuery
+from openpyxl import load_workbook
 from StringIO import StringIO
 
 from dataiter import DataIterator
@@ -178,7 +179,37 @@ class JSONParser(Parser):
         raise
 
 class ExcelParser(Parser):
-    pass
+    def __init__(self, f, fname, sheet=None, **kwargs):
+        # ignore f
+        self.fname = fname
+        self.s = sheet
+        if not sheet:
+            raise "ExcelParser expects a sheet"
+    
+    def get_data_iter(self):
+        # if first row with data has style and non of the other rows have style
+        # then it's a header row
+        rows = self.s.rows
+        if len(rows) <= 1:
+            return None
+
+
+        # skip empty rows
+        idx = 0
+        while idx < len(rows):
+            if [c for c in rows[idx] if str(c.value).strip()]:
+                break
+            idx += 1
+        rows = rows[idx:]
+        
+        header = None        
+        if sum(1 for c in rows[0] if c.has_style) > 0.8 * len(rows[0]):
+            header = [c.value for c in rows[0]]
+            rows = rows[1:]
+        
+        rows = [[c.value for c in r] for r in rows]            
+
+        return DataIterator(lambda: iter(rows), header=header, fname=self.fname)
 
 class HTMLTableParser(Parser):
     """
@@ -225,6 +256,8 @@ def get_readers(fname, **kwargs):
         return get_readers_from_url(fname)
     elif is_url_file(fname):
         return get_readers_from_url_file(fname, **kwargs)
+    elif is_excel_file(fname):
+        return get_readers_from_excel_file(fname, **kwargs)
     elif os.path.isdir(fname):
         dataiters = []
         args = {'kwargs' : kwargs, 'dataiters' : dataiters}
@@ -382,6 +415,27 @@ def get_readers_from_zip_file(fname, **kwargs):
     except Exception as e:
         _log.info('get_from_zip_file\t%s', e)
         return []
+
+
+def get_readers_from_excel_file(fname, **kwargs):
+    ret = []
+    try:
+        w = load_workbook(fname)
+        for sname in w.get_sheet_names():
+            s = w.get_sheet_by_name(sname)
+            try:
+                parser = ExcelParser(None, fname, sheet=s)
+                i = parser.get_data_iter()
+                consistent, ncols = html_rows_consistent(i())
+                if consistent and ncols > 1:
+                    ret.append(i)
+            except:
+                _log.info(traceback.format_exc())
+    except:
+        _log.info(traceback.format_exc())
+    return ret
+
+    
 if __name__ == '__main__':
 
     fname = '/Users/sirrice/Desktop/lastpermissiondenied.json'

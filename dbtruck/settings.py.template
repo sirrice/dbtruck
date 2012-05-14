@@ -1,2 +1,5 @@
 ZIPDIRNAME = '__dbtruck__unzips__'
 DLDIRNAME = '__dbtruck_downloads__'
+
+BING_APIKEY = ''
+YAHOO_APIKEY = ''

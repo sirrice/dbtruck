@@ -11,6 +11,7 @@ import traceback
 from operator import and_
 from collections import *
 from pyquery import PyQuery
+from openpyxl import load_workbook
 from dateutil.parser import parse as dateparse
 
 from ..util import get_logger
@@ -109,5 +110,12 @@ def is_html_file(fname, **kwargs):
             return False
         with file(fname, 'r') as f:
             return len(PyQuery(f.read())('table')) > 0
+    except:
+        return False
+
+def is_excel_file(fname, **kwargs):
+    try:
+        load_workbook(fname)
+        return True
     except:
         return False

@@ -26,19 +26,22 @@ re_nonasciistart = re.compile('^[^\w]')
 
 
 def infer_header_row(rowiter, types):
-    header = rowiter.next()
-    htypes = map(get_type, header)
-    matches = sum([ht == t and ht != None and t != str for ht, t in zip(htypes, types)])
+    try:
+        header = rowiter.next()
+        htypes = map(get_type, header)
+        matches = sum([ht == t and ht != None and t != str for ht, t in zip(htypes, types)])
 
-    if matches > 0:
+        if matches > 0:
+            return False
+
+        if max(map(len, header)) > 100:
+            return False
+
+        # lots of more complex analysis goes HERE
+        return True
+    except:
         return False
 
-    if max(map(len, header)) > 100:
-        return False
-
-    # lots of more complex analysis goes HERE
-
-    return True
 
 
 def clean_header(header):
@@ -108,7 +111,7 @@ def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass
 
 
 def transform_and_validate(types, row):
-    #row = map(str2sqlval, zip(types, row))
+    row = map(str2sqlval, zip(types, row))
     return row
     #val = map(validate_type, zip(types, row))
     if reduce(lambda a,b: a and b, val):

@@ -63,10 +63,10 @@ class PGMethods(BaseMethods):
     def handle_error(self, errcode, col, val, row):
         """
         This method caches the data that caused import errors in memory, and alters the schema
-            to deal with the errors after a threshold number of the same error types have been encountered.
+        to deal with the errors after a threshold number of the same error types have been encountered.
 
-            When the schema is changed to fix an error, the rows that caused the errors are added back 
-            into the queue of rows to import
+        When the schema is changed to fix an error, the rows that caused the errors are added back 
+        into the queue of rows to import
 
         errors described on http://www.postgresql.org/docs/8.1/static/errcodes-appendix.html
         @return list of rows to re-import
@@ -87,7 +87,7 @@ class PGMethods(BaseMethods):
             # 22001: make column size longer
             # 22007: change column into varchar
             # 22P02: integer column but got string
-            newlen = max(map(len, vals)) * 2
+            newlen = max(64, max(map(len, map(to_utf, vals))) * 2)
             newtype = 'varchar(%d)' % newlen if newlen <= 1024 else 'text'
             query = "alter table %s alter %s type %s" % (self.tablename, col, newtype)
 
@@ -109,7 +109,7 @@ class PGMethods(BaseMethods):
             if col is None:
                 newrow.append('NULL')
             elif isinstance(col, basestring):
-                newrow.append(col.encode('utf-8', errors='ignore').replace('\t', ' '))
+                newrow.append(to_utf(col).replace('\t', ' '))
             else:
                 newrow.append(str(col).replace('\t', ' '))
         return '\t'.join(newrow)

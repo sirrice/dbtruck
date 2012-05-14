@@ -1,13 +1,19 @@
-import sys, csv
+import sys
+import csv
+import re
+import math
 import datetime
+
 from collections import *
 from dateutil.parser import parse as dateparse
-import math
+
 
 # notes: alter table readings alter column time type time using (time::time);
 
+re_null_chars = re.compile('[\*-_\.\?]+')
+
 def get_type(val):
-    if not isinstance(val, str):
+    if not isinstance(val, basestring):
         return type(val)
     val = val.strip()
     if not val: return None
@@ -56,10 +62,13 @@ def validate_type((t, v)):
     return True
 
 def str2sqlval((t, val)):
-    if not isinstance(val, str):
+    if not isinstance(val, basestring):
         return val
-    val = val.strip()
+    if issubclass(t, basestring):
+        return val
     
+    val = val.strip()
+    nullval = re_null_chars.sub('', val)
     # try:
     #     if t == datetime.datetime:
     #         d = dateparse(val).strftime('%Y-%m-%d %H:%M:%S')
@@ -79,10 +88,13 @@ def str2sqlval((t, val)):
         if t == float:
             return float(val)
     except:
+        if not nullval:
+            return None
         return 0
 
-    if val == '':
+    if not nullval:
         return None
+
     return val
 
 

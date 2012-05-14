@@ -28,8 +28,10 @@ machine, and uses `psql` to load data.
 
 * Python
 * [dateutil](http://labix.org/python-dateutil#head-2f49784d6b27bae60cde1cff6a535663cf87497b)
+* [openpyxl](http://packages.python.org/openpyxl/usage.html)
 * [PostgreSQL](http://www.postgresql.org/download/) running locally
 * psql
+
 
 # Installation
 
