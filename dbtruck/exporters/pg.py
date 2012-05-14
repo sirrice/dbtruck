@@ -24,6 +24,7 @@ from base import BaseMethods
 
 _log = get_logger()
 copy_re = re.compile('line (?P<line>\d+), column\ (?P<col>\w+): \"(?P<val>.+)\"')
+cr_re = re.compile(r'[\r\f\v]')
 
 
 class PGMethods(BaseMethods):
@@ -51,6 +52,9 @@ class PGMethods(BaseMethods):
             drop = 'drop table %s;' % self.tablename
             stmts.extend([drop, create])
         sql = '\n'.join(stmts)
+
+        self.types = types
+        self.attribute = attrs
         return sql
 
     def setup_table(self, types, header, new):
@@ -109,27 +113,37 @@ class PGMethods(BaseMethods):
             if col is None:
                 newrow.append('NULL')
             elif isinstance(col, basestring):
-                newrow.append(to_utf(col).replace('\t', ' '))
+                newrow.append(cr_re.sub('\r', to_utf(col).replace('\t', ' ')))
             else:
                 newrow.append(str(col).replace('\t', ' '))
-        return '\t'.join(newrow)
+
+
+        if len(newrow) < len(self.types):
+            newrow += ['NULL'] * (len(self.types) - len(newrow))
+        if len(newrow) > len(self.types):
+            newrow = newrow[:len(self.types)]
+        return newrow
                 
 
     def run_copy(self, buf):
-        s = StringIO('\n'.join(map(self.prepare_row_for_copy, buf)))
+        s = StringIO()
+        w = csv.writer(s)
+        w.writerows(map(self.prepare_row_for_copy, buf))
         s.seek(0)
 
         error = None
         start = time.time()
         try:
             cur = self.db.cursor() 
-            cur.copy_from(s, self.tablename, sep='\t', null='NULL')
+            cur.copy_from(s, self.tablename, sep=',', null='NULL')
             self.db.commit()
             cur.close()
             return None # good
         except Exception as e:
             error = e
             self.db.rollback()
+        finally:
+            s.close()
         return error
             
     def import_block(self, buf, iterf):

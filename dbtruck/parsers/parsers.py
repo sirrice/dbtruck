@@ -291,7 +291,7 @@ def get_readers_from_text_file(fname, **kwargs):
     bestparser, bestperc, bestncols = None, 0., 1
     for parser in text_parsers:
         try:
-            with file(fname, 'r') as f:
+            with file(fname, 'rU') as f:
                 p = parser(f, fname, **kwargs)
                 i = p.get_data_iter()
                 perc_maj, ncols = rows_consistent(i())
@@ -305,7 +305,7 @@ def get_readers_from_text_file(fname, **kwargs):
     if not bestparser:
         _log.debug("Checking to see if user has offsets")
         try:
-            with file(fname, 'r') as f:
+            with file(fname, 'rU') as f:
                 p = OffsetFileParser(f, fname, **kwargs)
                 i = p.get_data_iter()
                 bestparser, bestncols = parser, ncols
@@ -363,7 +363,7 @@ def get_readers_from_html_content(fname, html, **kwargs):
 
 def get_readers_from_html_file(fname, **kwargs):
     try:
-        with file(fname, 'r') as f:
+        with file(fname, 'rU') as f:
             return get_readers_from_html_content(fname, f.read(), **kwargs)
     except:
         _log.info(traceback.format_exc())
@@ -385,7 +385,7 @@ def get_readers_from_url(url, **kwargs):
 
 def get_readers_from_url_file(fname, **kwargs):
     try:
-        with file(fname, 'r') as f:
+        with file(fname, 'rU') as f:
             for line in f:
                 line = line.strip()
                 if not line:
