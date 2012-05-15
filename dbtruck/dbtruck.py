@@ -46,18 +46,23 @@ def infer_header_row(rowiter, types):
 
 def clean_header(header):
     newheader = []
+    attridx = 0
     for value in header:
         try:
             ret = re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
-            ret = to_utf(ret)
+            ret = to_utf(ret).lower()
+            if not ret:
+                ret = 'attr%d' % attridx
         except:
             print value
-            raise
+            ret = 'attr%d' % attridx
+        attridx += 1
         newheader.append(ret.lower())
 
     # XXX: ensure that header doesn't have overlapping values
     if len(set(newheader)) < len(newheader):
-        raise Exception, "duplicate elements in header\t%s" % str(newheader)
+        _log.info("duplicate elements in header\t%s", str(newheader))
+        return None
     return newheader
     
 

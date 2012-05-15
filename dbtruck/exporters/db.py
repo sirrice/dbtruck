@@ -24,11 +24,11 @@ def prepare(db, queryline, bexit=True):
         if bexit:
             sys.exit()
 
-def query(db, queryline):
+def query(db, queryline, args=()):
     if db == None: return []
     try:
         cur = db.cursor()
-        cur.execute(queryline)
+        cur.execute(queryline, args)
         try:
             result = cur.fetchall()
         except:

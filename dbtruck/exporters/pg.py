@@ -127,7 +127,7 @@ class PGMethods(BaseMethods):
 
     def run_copy(self, buf):
         s = StringIO()
-        w = csv.writer(s)
+        w = csv.writer(s, delimiter='\t')
         w.writerows(map(self.prepare_row_for_copy, buf))
         s.seek(0)
 
@@ -135,7 +135,7 @@ class PGMethods(BaseMethods):
         start = time.time()
         try:
             cur = self.db.cursor() 
-            cur.copy_from(s, self.tablename, sep=',', null='NULL')
+            cur.copy_from(s, self.tablename, sep='\t', null='NULL')
             self.db.commit()
             cur.close()
             return None # good
@@ -204,7 +204,9 @@ class PGMethods(BaseMethods):
                 if len(cur_buf) > 10:
                     map(bufs.append, block_iter(cur_buf, 10))
                 elif len(cur_buf) > 1:
-                    map(self.import_row, cur_buf)
+                    #map(self.import_row, cur_buf)
+                    for buf in cur_buf:
+                        bufs.append([buf])
                 else:
                     row = cur_buf[0]
                     normrow = map(to_utf, row)
@@ -227,7 +229,7 @@ class PGMethods(BaseMethods):
             self.db.rollback()
             normrow = map(to_utf, row)
             print >>self.errfile, ','.join(normrow)
-            _log.warn("import row error\t%s", e)
+            #_log.warn("import row error\t%s", e)
             return error
 
 
