@@ -17,5 +17,5 @@ setup(name="dbtruck",
       packages = find_packages(),
       scripts = ['bin/importmydata.py'],
       #package_data = { '' : ['*sentiment.pkl.gz'] },
-      install_requires = ['argparse', 'DateUtils',],
+      install_requires = ['argparse', 'DateUtils', 'requests', 'pyquery'],
       keywords= "library query db import")
