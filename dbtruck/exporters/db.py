@@ -10,19 +10,21 @@ def connect(dbname):
         sys.exit()
     return db
 
-def prepare(db, queryline, bexit=True):
+def prepare(db, queryline, params=(), bexit=True):
     #print queryline
     if db == None: return
     try:
         cur = db.cursor()
-        cur.execute(queryline)
+        cur.execute(queryline, tuple(params))
         db.commit()
         cur.close()
     except:
         db.rollback()
-        sys.stderr.write( "DBError: %s\t%s\n" % ( queryline, sys.exc_info()))
+        #sys.stderr.write( "DBError: %s\t%s\n" % ( queryline, sys.exc_info()))
         if bexit:
             sys.exit()
+        raise
+            
 
 def query(db, queryline, args=()):
     if db == None: return []
@@ -34,8 +36,10 @@ def query(db, queryline, args=()):
         except:
             result = []
         cur.close()
-    except:
-        sys.stderr.write( "DBError: %s\t%s\n" % (queryline, sys.exc_info()))
+    except Exception as e:
+        db.rollback()
+        #sys.stderr.write( "DBError: %s\t%s\n" % (queryline, sys.exc_info()))
+        sys.stderr.write("%s" % e)
         result = []
         #sys.exit()
     return result

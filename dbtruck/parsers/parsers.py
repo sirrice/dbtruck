@@ -21,7 +21,7 @@ from openpyxl import load_workbook
 from StringIO import StringIO
 
 from dataiter import DataIterator
-from ..util import get_logger
+from ..util import get_logger, to_utf
 from util import *
 from dbtruck.parsers.util import _get_reader
 from ..settings import ZIPDIRNAME, DLDIRNAME
@@ -211,6 +211,47 @@ class ExcelParser(Parser):
 
         return DataIterator(lambda: iter(rows), header=header, fname=self.fname)
 
+
+class OldExcelParser(Parser):
+    def __init__(self, f, fname, sheet=None, **kwargs):
+        # ignore f
+        self.fname = fname
+        self.s = sheet
+        if not sheet:
+            raise "ExcelParser expects a sheet"
+    
+    def get_data_iter(self):
+        # if first row with data has style and non of the other rows have style
+        # then it's a header row
+        sheet = self.s
+        nrows = sheet.nrows
+        rows = [sheet.row(i) for i in xrange(nrows)]
+        if len(rows) <= 1:
+            return None
+
+
+        # skip empty rows
+        # empty rows typically have much fewer non-empty columns
+        # than the rest of the rows
+        idx = 0
+        while idx < len(rows):
+            ncontents = len([c for c in rows[idx] if c.ctype != 0])
+            if ncontents > 0.3 * nrows or ncontents > max(1, nrows - 2):
+                break
+            idx += 1
+        rows = rows[idx:]
+        
+        # header = None        
+        # if sum(1 for c in rows[0] if c.) > 0.8 * len(rows[0]):
+        #     header = [c.value for c in rows[0]]
+        #     rows = rows[1:]
+        
+        rows = [[to_utf(c.value) for c in r] for r in rows]            
+
+        return DataIterator(lambda: iter(rows), fname=self.fname)
+
+
+
 class HTMLTableParser(Parser):
     """
     Takes a <table> element and constructs an 
@@ -258,6 +299,8 @@ def get_readers(fname, **kwargs):
         return get_readers_from_url_file(fname, **kwargs)
     elif is_excel_file(fname):
         return get_readers_from_excel_file(fname, **kwargs)
+    elif is_old_excel_file(fname):
+        return get_readers_from_old_excel_file(fname, **kwargs)
     elif os.path.isdir(fname):
         dataiters = []
         args = {'kwargs' : kwargs, 'dataiters' : dataiters}
@@ -291,7 +334,7 @@ def get_readers_from_text_file(fname, **kwargs):
     bestparser, bestperc, bestncols = None, 0., 1
     for parser in text_parsers:
         try:
-            with file(fname, 'rU') as f:
+            with file(fname, 'rb') as f:
                 p = parser(f, fname, **kwargs)
                 i = p.get_data_iter()
                 perc_maj, ncols = rows_consistent(i())
@@ -305,7 +348,7 @@ def get_readers_from_text_file(fname, **kwargs):
     if not bestparser:
         _log.debug("Checking to see if user has offsets")
         try:
-            with file(fname, 'rU') as f:
+            with file(fname, 'rb') as f:
                 p = OffsetFileParser(f, fname, **kwargs)
                 i = p.get_data_iter()
                 bestparser, bestncols = parser, ncols
@@ -363,7 +406,7 @@ def get_readers_from_html_content(fname, html, **kwargs):
 
 def get_readers_from_html_file(fname, **kwargs):
     try:
-        with file(fname, 'rU') as f:
+        with file(fname, 'rb') as f:
             return get_readers_from_html_content(fname, f.read(), **kwargs)
     except:
         _log.info(traceback.format_exc())
@@ -385,7 +428,7 @@ def get_readers_from_url(url, **kwargs):
 
 def get_readers_from_url_file(fname, **kwargs):
     try:
-        with file(fname, 'rU') as f:
+        with file(fname, 'rb') as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -434,6 +477,25 @@ def get_readers_from_excel_file(fname, **kwargs):
     except:
         _log.info(traceback.format_exc())
     return ret
+
+def get_readers_from_old_excel_file(fname, **kwargs):
+    ret = []
+    try:
+        w = xlrd.open_workbook(fname)
+        for sheet in w.sheets():
+            nrows, ncols = sheet.nrows, sheet.ncols
+            try:
+                parser = OldExcelParser(None, fname, sheet=sheet)
+                i = parser.get_data_iter()
+                consistent, ncols = excel_rows_consistent(i())
+                if consistent and ncols > 1:
+                    ret.append(i)
+            except:
+                _log.info(traceback.format_exc())
+    except:
+        _log.info(traceback.format_exc())
+    return ret
+                
 
     
 if __name__ == '__main__':

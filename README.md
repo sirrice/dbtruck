@@ -64,6 +64,7 @@ Immediate ToDos
   * an HTML file may contain multiple tables to be imported
 * ~~Support downloading URLS and HTML files~~
 * ~~Support CSV output~~
+* ~~Support Excel Files~~
 
 
 ## Comments
