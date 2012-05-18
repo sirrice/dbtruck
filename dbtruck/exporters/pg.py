@@ -47,8 +47,14 @@ class PGMethods(BaseMethods):
         types = map(BaseMethods.type2str, types)
         stmts = []
         if new:
-            create = ',\n'.join(['%s %s null' % (attr, t) for attr, t in zip(attrs, types)])
-            create = 'create table %s (%s);' % (self.tablename, create)
+            cols = []
+            for attr, t in zip(attrs, types):
+                if attr == 'id':
+                    cols.append('id serial unique')
+                else:
+                    cols.append('%s %s null' % (attr, t))
+
+            create = 'create table %s (%s);' % (self.tablename, ', \n'.join(cols))
             drop = 'drop table %s;' % self.tablename
             stmts.extend([drop, create])
         sql = '\n'.join(stmts)

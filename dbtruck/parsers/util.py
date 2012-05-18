@@ -5,6 +5,7 @@ import logging
 import datetime
 import math
 import re
+import xlrd
 import pdb
 import traceback
 
@@ -29,6 +30,16 @@ def rows_consistent(iter):
     return float(maj)/tot >= 0.98, lens.most_common(1)[0][0]
 
 def html_rows_consistent(iter):
+    lens = get_row_counts(iter)
+    if not lens:
+        return False, 0
+    maj = lens.most_common(1)[0][1]
+    tot = sum(lens.values())
+    consistent = float(maj)/tot >= 0.6 and tot > 2
+    return consistent, lens.most_common(1)[0][0]
+
+
+def excel_rows_consistent(iter):
     lens = get_row_counts(iter)
     if not lens:
         return False, 0
@@ -80,7 +91,7 @@ def _get_reader(f, delim):
             except Exception as e:
                 _log.info(traceback.format_exc())                
     except:
-        pass
+        _log.info(traceback.format_exc())                
 
 
 
@@ -116,6 +127,14 @@ def is_html_file(fname, **kwargs):
 def is_excel_file(fname, **kwargs):
     try:
         load_workbook(fname)
+        return True
+    except:
+        return False
+
+
+def is_old_excel_file(fname, **kwargs):
+    try:
+        xlrd.open_workbook(fname)
         return True
     except:
         return False

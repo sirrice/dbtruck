@@ -69,15 +69,18 @@ def block_iter(l, nblocks=2):
         yield l[i:i+blocksize]
         i += blocksize      
     
-def to_utf(o):
+
+def to_utf(v):
     try:
-        return str(o)
+        return v.strftime('%m/%d/%Y %H:%M')
     except:
-        try:
-            return o.encode('utf-8', errors='ignore')
-        except:
-            return str(unicode(o, errors='ignore'))
-    return ''
+        if isinstance(v, unicode):
+            s = v.encode('utf-8', errors='ignore')
+        elif isinstance(v, basestring):
+            s = unicode(v, 'utf-8', errors='ignore').encode('utf-8', errors='ignore')
+        else:
+            s = str(v)
+        return s
 
 
 

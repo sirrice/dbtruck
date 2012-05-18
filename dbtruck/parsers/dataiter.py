@@ -6,6 +6,7 @@ class DataIterator(object):
         self.fname = None
         self.file_index = 0  # keeps track of which table in th file this object refers to
         self.header = None
+        self.add_id_col = False
         self.types = None
         self.__dict__.update(kwargs)
 

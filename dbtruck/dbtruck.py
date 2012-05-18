@@ -53,6 +53,8 @@ def clean_header(header):
             ret = to_utf(ret).lower()
             if not ret:
                 ret = 'attr%d' % attridx
+            if re.match('\d+', ret):
+                ret = '_%s' % ret
         except:
             print value
             ret = 'attr%d' % attridx
@@ -83,8 +85,10 @@ def infer_metadata(iterf):
     if not iterf.header:
         iterf.header = ['attr%d' % i for i in xrange(len(iterf.types))]
 
-
-
+    if 'id' not in iterf.header:
+        iterf.header.append('id')
+        iterf.add_id_col = True
+        iterf.types.append(int)
             
     _log.info( 'types:\t%s', ' '.join(map(str, iterf.types)) )
     _log.info( 'headers:\t%s', iterf.header and ' '.join(iterf.header) or 'no header found' )
@@ -96,23 +100,36 @@ def get_readers_from_list(fnames):
             yield reader
 
 def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass):
-    idx = 0
-    for iterf in get_readers_from_list(fnames):
-        try:
-            if idx > 0:
-                newtablename = '%s_%d' % (tablename, idx)            
-            else:
-                newtablename = tablename
+    try:
+        new_errfile = False
+        if not errfile:
+            errfile = file('/tmp/dbtruck.errfile', 'a')
+            new_errfile = True
 
-            infer_metadata(iterf)
-            
-            exportmethods = exportmethodsklass(newtablename, dbname, errfile)
-            exportmethods.setup_table(iterf.types, iterf.header, new)
-            import_iterator(iterf, exportmethods)
-            idx += 1 # this is so failed tables can be reused
-        except Exception as e:
-            _log.warn(traceback.format_exc())
+        if isinstance(fnames, basestring):
+            fnames = [fnames]
 
+        idx = 0
+        for iterf in get_readers_from_list(fnames):
+            try:
+                if idx > 0:
+                    newtablename = '%s_%d' % (tablename, idx)            
+                else:
+                    newtablename = tablename
+
+                infer_metadata(iterf)
+
+                exportmethods = exportmethodsklass(newtablename, dbname, errfile)
+                exportmethods.setup_table(iterf.types, iterf.header, new)
+                import_iterator(iterf, exportmethods)
+                idx += 1 # this is so failed tables can be reused
+            except Exception as e:
+                _log.warn(traceback.format_exc())
+
+        if new_errfile:
+            errfile.close()
+    except:
+        _log.warn(traceback.format_exc())
 
 
 def transform_and_validate(types, row):
@@ -136,6 +153,9 @@ def import_iterator(iterf, dbmethods):
     for rowidx, row in enumerate(rowiter):
 
         row = transform_and_validate(types, row)
+
+        if iterf.add_id_col:
+            row.append(str(rowidx))
 
         if row is not None and len(row) == len(iterf.types):
             buf.append(row)
