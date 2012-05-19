@@ -17,7 +17,7 @@ import dbtruck.settings as settings
 def create_hidden_table(db, table):
     loctable = '_%s_loc_' % table
     try:
-        query(db, 'select count(*) from %s' % loctable)[0]
+        db.execute('select count(*) from %s' % loctable).fetchone()[0]
         return loctable
     except:
         try:
@@ -37,27 +37,27 @@ def create_hidden_table(db, table):
                  zoom float null,
                  shape polygon null        
             )""" % (loctable, table)
-            prepare(db, q, bexit=False)
+            db.execute(q, bexit=False)
 
             q = 'create index %s_id on %s (id);' % (loctable, loctable)
-            prepare(db, q, bexit=False)
+            db.execute(q, bexit=False)
             return loctable
         except:
             traceback.print_exc()
             return None
 
 def get_table_cols(db, table):
-    cols = query(db, """select column_name from
+    cols = db.execute("""select column_name from
     information_schema.columns where table_name = '%s' order by
-    ordinal_position asc""" % table)
+    ordinal_position asc""" % table).fetchall()
     return [c[0] for c in cols]
     
 
 def get_all_table_names(db):
     try:
-        tables = query(db, """select table_name from
+        tables = db.execute("""select table_name from
         information_schema.tables where table_schema = 'public' and
-        table_type = 'BASE TABLE';""")
+        table_type = 'BASE TABLE';""").fetchall()
         return [row[0] for row in tables]
     except:
         return []
@@ -89,3 +89,12 @@ def get_table_name_pairs(db):
     return pairs
 
 
+if __name__ == '__main__':
+    from sqlalchemy import *
+    from sqlalchemy.orm import scoped_session, sessionmaker
+    from sqlalchemy.ext.declarative import declarative_base
+
+    db = create_engine('postgresql://sirrice@localhost:5432/test')
+
+    for pair in get_table_name_pairs(db):
+        print pair

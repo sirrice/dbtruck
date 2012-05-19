@@ -19,7 +19,7 @@ from StringIO import StringIO
 from ..util import get_logger, to_utf
 from util import block_iter
 from infertypes import *
-from db import connect
+from sqlalchemy import *
 from base import BaseMethods
 
 _log = get_logger()
@@ -31,7 +31,8 @@ class PGMethods(BaseMethods):
 
     def __init__(self, *args, **kwargs):
         super(PGMethods, self).__init__(*args, **kwargs)
-        self.db = connect(self.dbname)
+        self.engine = create_engine('postgresql://sirrice@localhost:5432/%s' % self.dbname)
+        self.db = self.engine.raw_connection()
 
         # haven't decided if storing state in here is a good idea or
         # not, but it's necessary to do error mitigation
@@ -54,8 +55,8 @@ class PGMethods(BaseMethods):
                 else:
                     cols.append('%s %s null' % (attr, t))
 
-            create = 'create table %s (%s);' % (self.tablename, ', \n'.join(cols))
-            drop = 'drop table %s;' % self.tablename
+            drop = 'drop table %s cascade;' % self.tablename
+            create = 'create table %s (%s);' % (self.tablename, ', \n'.join(cols))            
             stmts.extend([drop, create])
         sql = '\n'.join(stmts)
 
@@ -103,11 +104,8 @@ class PGMethods(BaseMethods):
 
 
         if query:
-            cur = self.db.cursor()
-            cur.execute(query)
-            self.db.commit()
-            cur.close()
-
+            self.engine.execute(query)
+            
             del self.prev_errors[key]
             # import the rows related to the error that we just fixed!            
             return rows
@@ -223,16 +221,12 @@ class PGMethods(BaseMethods):
 
     def import_row(self, row):
         try:
-            cur = self.db.cursor()
             args = ','.join(["%s"] * len(row))
             query = "insert into %s values (%s)" % (self.tablename, args)
-            cur.execute(query, tuple(row))
-            self.db.commit()
-            cur.close()
+            self.engine.execute(query, tuple(row))
             return None
         except Exception as e:
             error = e
-            self.db.rollback()
             normrow = map(to_utf, row)
             print >>self.errfile, ','.join(normrow)
             #_log.warn("import row error\t%s", e)

@@ -17,12 +17,12 @@ class LocationMD(object):
         self.db = db
         self.MDNAME = '_dbtruck_metadata_loc_'
         try:
-            prepare(db, """create table %s (
+            db.execute("""create table %s (
             tablename varchar(128) not null,
             tested bool default false,
             hasloc bool default false,
             maxid int default 0,
-            done bool default false)""" % self.MDNAME, bexit=False)
+            done bool default false)""" % self.MDNAME)
         except:
             pass
 
@@ -30,7 +30,7 @@ class LocationMD(object):
         try:
             q = """select tablename, tested, hasloc, maxid, done from %s
             where tablename = %%s""" % self.MDNAME
-            rows = query(self.db, q, (table,))
+            rows = self.db.execute(q, (table,)).fetchall()
             return rows[0]
         except:
             return [table, False, False, 0, False]
@@ -51,14 +51,14 @@ class LocationMD(object):
         try:
             maxid = self.max_id(table)
             q = "select count(*) from %s where id > %d" %   (table, maxid)
-            return query(self.db, q)[0][0]
+            return self.db.execute(q).fetchone()[0]
         except:
             return 0
         
     def has_row(self, table):
         try:
             q = "select * from %s where tablename = %%s" %self.MDNAME
-            query(self.db, q, (table,))[0]
+            self.db.execute(q, (table,)).fetchone()
             return True
         except:
             return False
@@ -74,7 +74,7 @@ class LocationMD(object):
                          ','.join(kwargs.keys()),
                          ','.join(['%s'] * len(kwargs)))
                 params = tuple(kwargs.values())
-                prepare(self.db, q, params, bexit=False)
+                self.db.execute(q, params)
                 return True
             else:
                 q = "update %s set %s where %s"
@@ -82,7 +82,7 @@ class LocationMD(object):
                          ','.join(['%s = %%s' % k for k in kwargs.keys()]),
                          'tablename = %s')
                 params = list(kwargs.values()) + [table]
-                prepare(self.db, q, tuple(params), bexit=False)
+                self.db.execute(q, tuple(params))
                 return True
         except Exception as e:
             print e

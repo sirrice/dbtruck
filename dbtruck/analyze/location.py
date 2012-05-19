@@ -29,7 +29,9 @@ from hidden import *
 from fuzzyjoin import *
 from metadata import *
 from dbtruck.exporters.db import *
+from dbtruck.util import to_utf
 import dbtruck.settings as settings
+
 
 addr_suffixes = ['av(e(nue)?)?',
                  'st(reet)?',
@@ -48,14 +50,19 @@ addr_suffixes = ['av(e(nue)?)?',
 re_addr1 = re.compile(r'\s+(%s)\w{0,50}$' % '|'.join(addr_suffixes))
 re_addr1_num = re.compile(r'\w?\d+(\s+|[^rd|th|nd|st])')
 re_addr2 = re.compile(r'^\s*\d{1,6}(\s+[a-zA-Z\-]+){1,3}\s*$')
+re_addrx = re.compile(r'(([a-zA-Z\-]+){1,3}\s+(%s)(\s+|$)){2}' % '|'.join(addr_suffixes))
 
 re_coord_w = re.compile(r'(?P<a>\d+)X(?P<b>\d+)X(?P<c>\d+\.?\d+?)X?[wW]')
 re_coord_n = re.compile(r'(?P<a>\d+)X(?P<b>\d+)X(?P<c>\d+\.?\d+?)X[nN]')
+
+re_badchar = re.compile(r'[^\w\.\-\(\)]')
 
 ZIPCODES = get_zipcodes()
 STATES = get_states()
 COUNTYNAMES = []
 FIPS = []
+
+
 
 def parse_coords(v):
     try:
@@ -75,140 +82,126 @@ def parse_coords(v):
         lon = (absdlon + absmlon/60. + absslon/3600.) * lonsign/1000000.
         return lat, lon
     except:
-        return None
+        pass
+    try:
+        lat, lon = map(float, v.split())
+        if -90 < lat and lat < 90 and -180 < lon and lon < 180:
+            return lat, lon
+    except:
+        pass
+    
+    return None, None
+
+def parse_lat(v):
+    try:
+        v = float(v)
+        if -90 < v and v < 90:
+            return v
+    except:
+        pass
+    return None
+def parse_lon(v):
+    try:
+        v = float(v)
+        if -180 < v and v < 180:
+            return v
+    except:
+        pass
+    return None
+def parse_zip(v):
+    return ZIPCODES.get(v, None)
+def parse_state(v):
+    return STATES.get(v, None)
+def parse_per_word_state(v):
+    ss = filter(lambda s:s, map(parse_state, v.split()))
+    return ss[0] if ss else None
+def parse_per_word_zip(v):
+    ss = filter(lambda s:s, map(parse_zip, v.split()))
+    return ss[0] if ss else None
+def parse_addrs(v):
+    if len(v) < 100:
+        m = re_addr2.search(v)
+        if m:
+            return v
+            #return m.string[m.start():m.end()]
+        m = re_addrx.search(v)
+        if m:
+            return v
+            #return m.string[m.start():m.end()]
+        m = re_addr1.search(v)
+        n = re_addr1_num.search(v)
+        if m and n:
+            return v
+            #return m.string[m.start():m.end()]
+    return None
 
 
-
-def possible_loc(colname, coltype, vals):
+def possible_loc(colname, vals):
     def is_ok(new_vals, maxposs=vals, thresh=0.65):
-        return len(filter(lambda s: s, new_vals)) > thresh * len(maxposs)
+        n = 0
+        for v in new_vals:
+            if isinstance(v, list) or isinstance(v, tuple):
+                if filter(lambda s:s, v):
+                    n += 1
+            else:
+                if v != None:
+                    n += 1
+        if float(n) > thresh * len(maxposs):
+            return n
+        return False
 
+    vals = [ re_badchar.sub(' ', to_utf(v)).lower().strip() for v in vals if v]
     nonempty = [v for v in vals if v]        
     colname = colname.lower().strip()
-    ret = {}
+    ret = {}#defaultdict()
     
     if 'lat' in colname:
-        lats = []
-        for v in vals:
-            try:
-                v = float(v)
-                if -90 < v and v < 90:
-                    lats.append(v)
-                else:
-                    lats.append(None)
-            except:
-                lats.append(None)
+        lats = map(parse_lat, vals)
         if is_ok(lats, nonempty, thresh=0.8):
-            ret['latitude'] = lats
+            ret['latitude'] = 'parse_lat'
 
     if 'lon' in colname:
-        lons = []
-        for v in vals:
-            try:
-                v = float(v)
-                if -180 < v and v < 180:
-                    lons.append(v)
-                else:
-                    lons.append(None)
-            except:
-                lons.append(None)
+        lons = map(parse_lon, vals)
         if is_ok(lons, nonempty, thresh=0.8):
-            ret['longitude'] = lons
+            ret['longitude'] = 'parse_lon'
 
     if 'latitude' in ret and 'longitude' in ret:
         return ret
 
-    coords = map(parse_coords, vals)
-    if is_ok(coords, nonempty, thresh=0.6):
-        lats, lons = [], []
-        for coord in coords:
-            if coord:
-                lats.append(coord[0])
-                lons.append(coord[1])
-            else:
-                lats.append(None)
-                lons.append(None)
-        ret['latitude'] = lats
-        ret['longitude'] = lons
+    if is_ok(map(parse_coords, vals), nonempty, thresh=0.5):
+        ret['latlon'] = 'parse_coords'
         return ret
-    
 
 
-    vals = [ re_nonwords.sub(' ', str(v)).lower().strip() for v in vals if v]
-    nonempty = [v for v in vals if v]
 
-    # maybe its a composite of latitude longitude
-    failures = 0.
-    lats, lons = [], []
-    for v in vals:
-        try:
-            lat, lon = map(float, v.split())
-            if -90 < lat and lat < 90 and -180 < lon and lon < 180:
-                lats.append(lat)
-                lons.append(lon)
-        except:
-            lats.append(None)
-            lons.append(None)
-            failures += 1
-            if failures > 0.5 * len(lats) + 10:
-                break
-    if is_ok(lats, nonempty, thresh=0.8):
-        return {'latitude' : lats, 'longitude' : lons}
-
-    # zipcodes
     if 'zip' in colname:
-        zips = [ZIPCODES.get(v, None) for v in vals]
+        zips = map(parse_zip, vals)
         if is_ok(zips, nonempty):
-            return {"zipcode" : zips}
+            return {"zipcode" : 'parse_zip'}
             
-    # states
     if colname.startswith('st'):
-        states = [STATES.get(v, None) for v in vals]
+        states = map(parse_state, vals)
         if is_ok(states, nonempty):
-            return {'state' : states}
+            return {'state' : 'parse_state'}
+
+    zips = map(parse_per_word_zip, vals)
+    if is_ok(zips, nonempty, thresh=0.8):
+        ret['zipcode'] = 'parse_per_word_zip'
+
+    states = map(parse_per_word_state, vals)
+    if is_ok(states, nonempty, thresh=0.8):
+        ret['state'] = 'parse_per_word_state'
 
 
     # county codes
-
     # countries
-    
+
     # street addresses (number string string suffix)
     # column is not a single attribute, lets look for composite data
     # ok maybe its embedded in the text??
-
-
-    allwords = [v.split() for v in vals]
-    states = []
-    zips = []
-    for words in allwords:
-        ss = filter(lambda s: s, [STATES.get(w, None) for w in words])
-        states.append(ss[0] if ss else None)
-
-        zz = filter(lambda z:z, [ZIPCODES.get(w, None) for w in words])
-        zips.append(zz[0] if zz else None)
-            
-    if is_ok(states, nonempty, thresh=0.8):
-        ret['state'] = states
-    if is_ok(zips, nonempty, thresh=0.8):
-        ret['zipcode'] = zips
-
-
-    addrs = [re_addr2.search(v) for v in vals if len(v) < 100]
-
+    addrs = map(parse_addrs, vals)
     if is_ok(addrs, nonempty, thresh=0.55):
-        addrs = [m and m.string[m.start():m.end()] or m for m in addrs]
-        ret['address'] = addrs
-    else:
-        addrs = [re_addr1.search(v) for v in vals if len(v) < 100]
-        if is_ok(addrs, nonempty):
-            nums = [re_addr1_num.search(v) for v in vals if len(v) < 100]
-            addrs = [a and n for a, n in zip(addrs, nums)]
-            if is_ok(addrs, nonempty, thresh=0.5):
-                ret['address'] = vals
-            else:
-                ret['near-address'] = vals
-
-    # cross streets (string* suffix ?? string* suffix)
+        ret['address'] = 'parse_addrs'
     return ret
 
 
@@ -304,16 +297,16 @@ def get_latlon_annotations(address=None, **kwargs):
 
 
 def find_location_columns(db, table, maxid=0):
-    cols = query(db, """select column_name, data_type from
+    cols = db.execute("""select column_name, data_type from
     information_schema.columns where table_name = '%s' order by
-    ordinal_position asc""" % table)
+    ordinal_position asc""" % table).fetchall()
     if not cols:
         return {}, {}
     colnames, coltypes = zip(*cols)
 
     arg = ','.join(colnames)
-    res = query(db, """select %s from %s where id >= %s order by id asc
-                       limit 1500""" % (arg, table, maxid))
+    res = db.execute("""select %s from %s where id >= %s order by id asc
+                       limit 1500""" % (arg, table, maxid)).fetchall()
     data = zip(*res)
 
     loc_dict = defaultdict(list)
@@ -348,7 +341,7 @@ def insert_annotations(db, table, annotations, **kwargs):
     for idx, anno in enumerate(annotations):
         try:
             params = [anno.get(attr, None) for attr in attrs]
-            prepare(db, q, tuple(params), bexit=False)
+            db.execute(q, tuple(params))
             maxid = anno['id']
             if maxinserts and idx > maxinserts:
                 break
@@ -424,7 +417,7 @@ def join_regular_and_hidden_tables(db, regtable):
 
         q = "select %s, %s from %s, %s where %s.id = %s.id"
         q = q % (sel1, sel2, regtable, loctable, regtable, loctable)
-        rows = query(db, q)
+        rows = db.execute(q).fetchall()
         return [dict(zip(sels, row)) for row in rows]
     except:
         traceback.print_exc()
@@ -436,8 +429,12 @@ def analyze_all_tables(db):
             create_and_populate_location_table(db, regtable)
 
 if __name__ == '__main__':
+    from sqlalchemy import *
+    from sqlalchemy.orm import scoped_session, sessionmaker
+    from sqlalchemy.ext.declarative import declarative_base
 
-    db = connect('test')
+    db = create_engine('postgresql://sirrice@localhost:5432/test')
+
     
     # for regtable, loctable in get_table_name_pairs(db):
     #     print regtable, loctable
@@ -454,7 +451,6 @@ if __name__ == '__main__':
     #loc_dict, colname_dict = find_location_columns(db, 'buildings_3')
     create_and_populate_location_table(db, 'tacobell', maxinserts=30,
                                        locdata=None)
-    db.close()
     exit()
 
 
