@@ -3,22 +3,21 @@ import os
 import sys
 import pdb
 import time
+import random
 import pickle
 import traceback
 sys.path.extend(['..', '.', '../exporters'])
 
 from operator import add, and_
-from geopy import geocoders
 from collections import defaultdict
 from sqlalchemy import *
 
+from geocode import DBTruckGeocoder
 from database import init_db, db_session
 from location import possible_loc, re_badchar
 from models import *
 from load_data import *
 from hidden import *
-from fuzzyjoin import *
-from metadata import *
 from dbtruck.exporters.db import *
 from dbtruck.util import to_utf
 import dbtruck.settings as settings
@@ -49,6 +48,8 @@ drop _shape,
 drop _zipcode,
 drop _geocoded
 """
+
+__geocoder__ = DBTruckGeocoder()
 
 def reset_system(db):
     drop_shadows(db)
@@ -98,6 +99,8 @@ def run_location_extractor(db, filter=None):
     for tablemd, schema in zip(tablemds, meta.tables.values()):
         if not filter(tablemd.tablename):
             continue
+        if tablemd.tablename.startswith('__dbtruck'):
+            continue
 
         try:
             state = run_state_machine(db, tablemd, schema)
@@ -119,7 +122,7 @@ def run_state_machine(db, tablemd, schema):
     print tablename
 
     cols = schema.columns.keys()
-    if tablemd.state == 0:
+    if tablemd.state == 0 or ('_latlon' not in cols and '_address' not in cols):
         # check if table exists in metadata table
         print '\tstate 0'
         if '_latlon' not in cols and '_address' not in cols:
@@ -196,8 +199,10 @@ def geocode_table(db, tablemd):
                   anno.loctype == Annotation.USERINPUT]
     user_input = user_input[0] if user_input else None
 
-    delay = 0.6 # delay between geocoding requests
+    restriction_latlon_dict = {}
+    delay = 0.1 # delay between geocoding requests
     maxid = None
+    idx = 0
     while True:
         row = resproxy.fetchone()
         if not row:
@@ -223,37 +228,44 @@ def geocode_table(db, tablemd):
             if zipcode:
                 restriction.append(zipcode)
             restriction = ' , '.join(restriction)
-            
-        if restriction:
-            format_string = '%s, '  + restriction
-        else:
-            format_string = '%s'
 
-        g = geocoders.Google(format_string=format_string)
-        #g = geocoders.Yahoo(settings.YAHOO_APPID, format_string=format_string)
-        
         try:
-            locs = g.geocode(address, exactly_one=False)
-            if locs:
-                loc = locs[0]
-                lat, lon = tuple(loc[1])
-                query = format_string % address
-                description = loc[0]
+            result = __geocoder__.geocode(address, restriction)
+            print result
+            if result:
+                description, (lat, lon), query = result
 
                 q = """update %s set _latlon = point(%%s, %%s), _query = %%s,
-                       _description = %%s, _geocoded = true where id =
-                       %%s""" % tablename
+                      _description = %%s, _geocoded = true 
+                      where id = %%s""" % tablename
                 db.execute(q, [lat, lon, query, description, rid])
-                print '\t', loc
-        except KeyboardInterrupt:
-            break
+
         except Exception as e:
-            if 'limit' in str(e).lower():
+            e = str(e).lower()
+            if 'limit' in e or 'rate' in e:
                 delay *= 1.1
-            raise
+            else:
+                raise
+
+            # XXX: this is a huge hack to ensure that location join
+            # module will re-compute the correlations because we
+            # have more location information
+            if idx % 50 == 0:
+                q = """delete from __dbtruck_corrpair__ where table1 =
+                %s or table2 = %s"""
+                db.execute(q, [tablename, tablename])
+            idx += 1
+
+
         time.sleep(delay)
 
+    # XXX: see above hack
+    q = """delete from __dbtruck_corrpair__ where table1 =
+                       %s or table2 = %s"""
+    db.execute(q, [tablename, tablename])
+
     return maxid
+
     
 
 def populate_shadow_cols(db, tablemd, schema):
@@ -357,12 +369,14 @@ def add_constant_annotation(tablemd, loctype, colname):
 
 if __name__ == '__main__':
     from database import db
-    drop_shadows(db)
-    delete_metadata(db)
+    #drop_shadows(db)
+    #delete_metadata(db)
     #reset_system(db)    
     Base = init_db()
 
     f = lambda t: t.startswith('ny')
+    f = lambda t: t not in ['crime', 'expends', 'income', 'lottery',
+                            'mass', 'parking']
     sleeptime = 10
     states = None
     while True:
