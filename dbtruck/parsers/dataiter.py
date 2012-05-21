@@ -100,7 +100,7 @@ class DataIterator(object):
                 if not ret:
                     ret = 'attr%d' % attridx
                 if re.match('\d+', ret):
-                    ret = '_%s' % ret
+                    ret = 'n_%s' % ret
             except:
                 print value
                 ret = 'attr%d' % attridx

@@ -51,7 +51,7 @@ import dbtruck.settings as settings
 
 
 
-def get_correlations(db):#, t1, t2):
+def get_correlations(db, db_session):#, t1, t2):
     """Loops through tables and computes pearson correlations between columns"""
     
     meta = MetaData(db)
@@ -64,6 +64,8 @@ def get_correlations(db):#, t1, t2):
     for tablemd in tablemds:
         table = tablemd.tablename
         radius = compute_radius(db, table)
+        if radius == None:
+            continue
         bshape = has_shape(db, table)
         tablestats.append((tablemd, radius, bshape))
     
@@ -74,6 +76,7 @@ def get_correlations(db):#, t1, t2):
             if len(db_session.query(CorrelationPair).filter(
                 CorrelationPair.md1 == tmd1,
                 CorrelationPair.md2 == tmd2 ).all()):
+                print "skipping", tmd1.tablename, tmd2.tablename
                 continue
             
             t1, t2 = tmd1.tablename, tmd2.tablename
@@ -88,6 +91,10 @@ def get_correlations(db):#, t1, t2):
                                      col1[0], col1[1], agg1,
                                      col2[0], col2[1], agg2,
                                      tmd1, tmd2)
+
+                db_session.add(cp)
+                db_session.commit()
+                print cp
                 res.append(cp)
     return res
 
@@ -100,9 +107,11 @@ def test_correlation(join):
         return ret
     statfuncs = [mine_correlation, pearson_correlation]
     cols = join[0].keys()
+    cols.sort()
     for idx, col1 in enumerate(cols):
-        for col2 in cols[idx:]:
-            if col1 == col2: continue
+        for col2 in cols:
+            if col1 <= col2:
+                continue
             for statfunc in statfuncs:
                 try:
                     cd1 = [row[col1] for row in join]
@@ -168,6 +177,8 @@ def dist_join(db, t1, t2, r, limit=7000):
            %s._latlon is not null and %s._latlon is not null
            """ % (t1, t2, t1, t2, t1, t2)
     count = db.execute(q, (r,)).fetchone()[0]
+    if count == 0:
+        return []
     thresh = float(limit) / count
     print "\tjoincount\t%d" % count, t1, t2
     
@@ -359,11 +370,14 @@ def compute_radius(db, table):
     """Computing radius sizes for a table"""
     # ath.erf(0.063 / (2 ** 0.5))
     # 5% of distribution falls within 0.063 * stddev
-    q = """select stddev(_latlon[0]), stddev(_latlon[1])
-    from %s where _latlon is not null""" % table
-    latstd, lonstd = db.execute(q).fetchone()
-    #return 0.063 * (latstd + lonstd) / 2.
-    return 0.03 * (latstd + lonstd) / 2.
+    try:
+        q = """select stddev(_latlon[0]), stddev(_latlon[1])
+        from %s where _latlon is not null""" % table
+        latstd, lonstd = db.execute(q).fetchone()
+        #return 0.063 * (latstd + lonstd) / 2.
+        return 0.03 * (latstd + lonstd) / 2.
+    except:
+        return None
 
 def has_shape(db, table):
     try:
@@ -385,13 +399,7 @@ if __name__ == '__main__':
     db.execute('delete from __dbtruck_corrpair__')
 
     while True:
-        res = get_correlations(db)
-        res.sort(key=lambda cp: cp.corr, reverse=True)
-
-        for cp in res:
-            print cp
-            db_session.add(cp)
-        db_session.commit()
+        res = get_correlations(db, db_session)
         print "sleeping"
         time.sleep(10)
     exit()

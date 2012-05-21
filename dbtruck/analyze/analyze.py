@@ -391,6 +391,6 @@ if __name__ == '__main__':
             if not changed:
                 sleeptime = min(10, sleeptime + 1)
             else:
-                sleeptime = 1
+                sleeptime = 0.5
         states = new_states
         time.sleep(sleeptime)
