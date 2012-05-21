@@ -1,18 +1,50 @@
+"""
+Types of joins that make sense
+Location
+- same zoom level
+  - nearest neighbor with radius
+- different zoom level
+  - within
+  - aggregate (avg, std, max, count)
+Time
+- same hour, same day, same day of week, same month, same day of month
+
+Location: has shape file, no shape file
+
+keep track of table that have
+1) been tested for joinability
+2) the joins to use
+
+invalidate table pairs where
+1) latlon or shape data has changed
+
+keep track of
+- column pairs to be compared
+  - within tables
+  - between tables and the joins to use
+
+compute correlations on
+- ordered subsets of the data
+- samples
+"""
+import math
 import csv
 import os
 import sys
 import numpy as np
 import pdb
 import traceback
+import xstats.MINE
 sys.path.extend(['..', '.', '../exporters'])
+
 
 from geopy import geocoders
 from collections import defaultdict
 from scipy.stats import pearsonr
 
 from models import *
-from load_data import *
-from hidden import *
+#from load_data import *
+#from hidden import *
 from dbtruck.exporters.db import *
 import dbtruck.settings as settings
 
@@ -20,40 +52,13 @@ import dbtruck.settings as settings
 
 
 def get_correlations(db):#, t1, t2):
-    """
-    Types of joins that make sense
-    Location
-    - same zoom level
-      - nearest neighbor with radius
-    - different zoom level
-      - within
-      - aggregate (avg, std, max, count)
-    Time
-    - same hour, same day, same day of week, same month, same day of month
-
-    Location: has shape file, no shape file
-
-    keep track of table that have
-    1) been tested for joinability
-    2) the joins to use
-
-    invalidate table pairs where
-    1) latlon or shape data has changed
-
-    keep track of
-    - column pairs to be compared
-      - within tables
-      - between tables and the joins to use
-
-    compute correlations on
-    - ordered subsets of the data
-    - samples
-    """
+    """Loops through tables and computes pearson correlations between columns"""
+    
     meta = MetaData(db)
     meta.reflect()
     tablenames = meta.tables.keys()
-    tablemds = [get_table_metadata(db, tn) for tn in tablenames]
-    tablemds = filter(lambda md: md.state == 5, tablemds)
+    tablemds = [Metadata.load_from_tablename(db, tn) for tn in tablenames]
+    tablemds = filter(lambda md: md.state >= 3, tablemds)
     
     tablestats = []
     for tablemd in tablemds:
@@ -61,7 +66,6 @@ def get_correlations(db):#, t1, t2):
         radius = compute_radius(db, table)
         bshape = has_shape(db, table)
         tablestats.append((tablemd, radius, bshape))
-        print table, radius, bshape
     
     res = []
     for idx, (tmd1, r1, s1) in enumerate(tablestats):
@@ -69,27 +73,23 @@ def get_correlations(db):#, t1, t2):
 
             if len(db_session.query(CorrelationPair).filter(
                 CorrelationPair.md1 == tmd1,
-                CorrelationPair.md2 == tmd2
-                ).all()):
+                CorrelationPair.md2 == tmd2 ).all()):
                 continue
-
             
             t1, t2 = tmd1.tablename, tmd2.tablename
             r = np.mean([r1, r2])
             djoinres = dist_join(db, t1, t2, r)
 
-            for corr, p, col1, col2 in test_correlation(djoinres):
-                colname1 = col1[1]
+            for corr, statname, col1, col2 in test_correlation(djoinres):
+
                 agg1 = col1[2] if len(col1) > 2 else None
-                colname2 = col2[1]
                 agg2 = col2[2] if len(col2) > 2 else None
-                cp = CorrelationPair(corr, colname1, agg1, colname2, agg2, tmd1, tmd2)
+                cp = CorrelationPair(corr, r, statname,
+                                     col1[0], col1[1], agg1,
+                                     col2[0], col2[1], agg2,
+                                     tmd1, tmd2)
                 res.append(cp)
     return res
-            #loc_join = run_join(db, t1, t2, r1, r2, s1, s2, 'loc_join')
-            #agg_join = run_join(db, t1, t2, r1, r2, s1, s2, 'aggregate_loc_join')
-            #test_correlation(loc_join)
-            #test_correlation(agg_join)
 
 
 def test_correlation(join):
@@ -98,23 +98,35 @@ def test_correlation(join):
     ret = []
     if not join:
         return ret
-    
+    statfuncs = [mine_correlation, pearson_correlation]
     cols = join[0].keys()
     for idx, col1 in enumerate(cols):
         for col2 in cols[idx:]:
             if col1 == col2: continue
-            try:
-                cd1 = [row[col1] for row in join]
-                cd2 = [row[col2] for row in join]
-                cd1 = map(lambda v: v and float(v) or 0, cd1)
-                cd2 = map(lambda v: v and float(v) or 0, cd2)
-                coef, p = pearsonr(cd1, cd2)
-                ret.append((coef, p, col1, col2))
-            except:
-                import pdb
-                pdb.set_trace()
+            for statfunc in statfuncs:
+                try:
+                    cd1 = [row[col1] for row in join]
+                    cd2 = [row[col2] for row in join]
+                    print "\tcorrelation", col1, col2, len(cd1)
+                    cd1 = map(lambda v: v and float(v) or 0, cd1)
+                    cd2 = map(lambda v: v and float(v) or 0, cd2)
+                    corr = statfunc(cd1, cd2)
+                    if math.isnan(corr):
+                        continue
+                    ret.append((corr, statfunc.__name__, col1, col2))
+                except Exception as e:
+                    import pdb
+                    pdb.set_trace()
     return ret
 
+def pearson_correlation(arr1, arr2):
+    return pearsonr(arr1, arr2)[0]
+
+def mine_correlation(arr1, arr2):
+    arr1 = np.array(arr1)
+    arr2 = np.array(arr2)
+    mic = xstats.MINE.analyze_pair(arr1, arr2)['MIC']    
+    return mic
 
 def run_join(db, t1, t2, r1, r2, s1, s2, prefix):
     if s1 and s2:
@@ -137,28 +149,34 @@ def run_join(db, t1, t2, r1, r2, s1, s2, prefix):
 
 ### Same zoom level
 
-def dist_join(db, t1, t2, r):
-    # given radius r1, r2, find overlapping lat lons
+def dist_join(db, t1, t2, r, limit=7000):
+    " given radius r1, r2, find overlapping lat lons "
+    
     t1cols = get_numeric_columns(db, t1, ignore=['id'])
     t2cols = get_numeric_columns(db, t2, ignore=['id'])
     sels1 = map(lambda s: '%s.%s' % (t1, s), t1cols)
     sels2 = map(lambda s: '%s.%s' % (t2, s), t2cols)
     sels = sels1 + sels2
+    
     if not sels:
         return []
+    
     cols = [(t1, c) for c in t1cols] + [(t2, c) for c in t2cols]
 
     q = """select count(*) from %s, %s
-           where (%s._latlon <-> %s._latlon) < %%s 
-           """ % (t1, t2, t1, t2)
+           where (%s._latlon <-> %s._latlon) < %%s and
+           %s._latlon is not null and %s._latlon is not null
+           """ % (t1, t2, t1, t2, t1, t2)
     count = db.execute(q, (r,)).fetchone()[0]
-    thresh = 5000. / count
-
+    thresh = float(limit) / count
+    print "\tjoincount\t%d" % count, t1, t2
+    
     q = """select %s from %s, %s
            where (%s._latlon <-> %s._latlon) < %%s and
+           %s._latlon is not null and %s._latlon is not null and
            random() <= %%s
-           """ % (','.join(sels), t1, t2, t1, t2)
-    res = db.execute(q, (r,thresh)).fetchall()
+           """ % (','.join(sels), t1, t2, t1, t2, t1, t2)
+    res = db.execute(q, (r, thresh)).fetchall()
     return [dict(zip(cols, row)) for row in res]
     
 
@@ -345,7 +363,7 @@ def compute_radius(db, table):
     from %s where _latlon is not null""" % table
     latstd, lonstd = db.execute(q).fetchone()
     #return 0.063 * (latstd + lonstd) / 2.
-    return 0.013 * (latstd + lonstd) / 2.
+    return 0.03 * (latstd + lonstd) / 2.
 
 def has_shape(db, table):
     try:
@@ -361,10 +379,22 @@ if __name__ == '__main__':
     from sqlalchemy.orm import scoped_session, sessionmaker
     from sqlalchemy.ext.declarative import declarative_base
     from database import *
-
+    import time
     #db = create_engine('postgresql://sirrice@localhost:5432/test')
     init_db()
+    db.execute('delete from __dbtruck_corrpair__')
 
+    while True:
+        res = get_correlations(db)
+        res.sort(key=lambda cp: cp.corr, reverse=True)
+
+        for cp in res:
+            print cp
+            db_session.add(cp)
+        db_session.commit()
+        print "sleeping"
+        time.sleep(10)
+    exit()
 
     t1, t2 = 'test2', 'test1'
     r1, r2 = 40, 5
@@ -380,10 +410,3 @@ if __name__ == '__main__':
     # print compute_radius(db, t1)
     # print compute_radius(db, t2)
     res = get_correlations(db)
-    res.sort(key=lambda cp: cp.corr, reverse=True)
-
-    for cp in res:
-        print cp
-        db_session.add(cp)
-    db_session.commit()
-

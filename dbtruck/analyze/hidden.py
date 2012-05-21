@@ -3,7 +3,7 @@ import os
 import sys
 import pdb
 import traceback
-sys.path.append(['..', '.', '../exporters'])
+sys.path.extend(['..', '.', '../exporters'])
 
 from geopy import geocoders
 from collections import defaultdict

@@ -269,17 +269,34 @@ class HTMLTableParser(Parser):
     def get_data_iter(self):
         self.f.seek(0)
         table = PyQuery(self.f.read())
-        ths = table('th')
-        header = [PyQuery(th).text() for th in ths] if ths else None
-
-        trs = table('tr')
+        
+        header = None
         rows = []
+        counter = Counter()
+        headers = []
+        bheaders = True
+        trs = table('tr')        
         for tr_el in trs:
             tr = PyQuery(tr_el)
+
+            if bheaders:
+                ths = tr('th')
+                if ths:
+                    headers.append([PyQuery(th).text() for th in ths])
+
             tds = tr('td')
+
             if tds:
                 row = [PyQuery(td).text() for td in tds]
                 rows.append(row)
+                counter[len(row)] += 1
+                bheaders = False
+
+        if len(counter):
+            ncols = counter.most_common(1)[0][0]
+            headers = filter(lambda h: len(h) == ncols, headers)
+            if headers:
+                header = headers[-1]
         return DataIterator(lambda: iter(rows), header=header, fname=self.fname)
 
 
