@@ -16,6 +16,7 @@ class DataIterator(object):
         self.fname = None
         self.file_index = 0  # keeps track of which table in th file this object refers to
         self.header = None
+        self.header_inferred = False
         self.add_id_col = False
         self.types = None
         self.__dict__.update(kwargs)
@@ -46,6 +47,7 @@ class DataIterator(object):
         # if we didn't find a header row, then lets default to
         # generating one
         if not self.header:
+            self.header_inferred = False
             self.header = ['attr%d' % i for i in xrange(len(self.types))]
 
         # ensure proper length by manufacturing extra header columns
@@ -69,7 +71,7 @@ class DataIterator(object):
         types = self.types
         
         try:
-            header = self.next()
+            header = self().next()
             htypes = map(get_type, header)
             matches = sum([ht == t and ht != None and t != str for ht, t in zip(htypes, types)])
 
@@ -81,6 +83,7 @@ class DataIterator(object):
 
             # lots of more complex analysis goes HERE
             self.header = header
+            self.header_inferred = True
         except:
             return
 
@@ -102,7 +105,7 @@ class DataIterator(object):
                 if re.match('\d+', ret):
                     ret = 'n_%s' % ret
             except:
-                print value
+                _log.info('clean_header\t%s', value)
                 ret = 'attr%d' % attridx
             attridx += 1
             newheader.append(ret.lower())

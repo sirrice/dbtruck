@@ -13,7 +13,6 @@ import traceback
 sys.path.append('..')
 sys.path.append( os.path.abspath(os.path.dirname(__file__)) )
 
-import dbtruck.settings as settings
 from collections import *
 from dateutil.parser import parse as dateparse
 from StringIO import StringIO
@@ -33,7 +32,10 @@ class PGMethods(BaseMethods):
 
     def __init__(self, *args, **kwargs):
         super(PGMethods, self).__init__(*args, **kwargs)
-        self.engine = create_engine(settings.DBURI_PREFIX + self.dbname)
+
+        self.dbname = kwargs['dbname']
+        self.hostname = kwargs.get('hostname', 'localhost')
+        self.engine = create_engine('postgresql://%s/%s' % (self.hostname, self.dbname))
         self.db = self.engine.raw_connection()
 
         # haven't decided if storing state in here is a good idea or

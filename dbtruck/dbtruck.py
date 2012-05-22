@@ -7,12 +7,12 @@ import logging
 import re
 import time
 import pdb
+moduledir = os.path.abspath(os.path.dirname(__file__)) 
+sys.path.append( moduledir )
 
 from collections import *
 from dateutil.parser import parse as dateparse
 
-moduledir = os.path.abspath(os.path.dirname(__file__)) 
-sys.path.append( moduledir )
 from infertypes import *
 from parsers.parsers import *
 from util import get_logger, to_utf
@@ -22,13 +22,10 @@ _log = get_logger()
 
 
 
+def import_datafiles(fnames, new, tablename, errfile, exportmethodsklass, parser=None, **kwargs):
+    if not parser:
+        parser = DBTruckParser('/tmp/', '/tmp/')
 
-def get_readers_from_list(fnames):
-    for fname in fnames:
-        for reader in get_readers(fname):
-            yield reader
-
-def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass):
     try:
         new_errfile = False
         if not errfile:
@@ -39,7 +36,7 @@ def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass
             fnames = [fnames]
 
         idx = 0
-        for iterf in get_readers_from_list(fnames):
+        for iterf in parser.get_readers(fnames):
             try:
                 if idx > 0:
                     newtablename = '%s_%d' % (tablename, idx)            
@@ -48,7 +45,7 @@ def import_datafiles(fnames, new, tablename, dbname, errfile, exportmethodsklass
 
                 iterf.infer_metadata()
 
-                exportmethods = exportmethodsklass(newtablename, dbname, errfile)
+                exportmethods = exportmethodsklass(newtablename, errfile, **kwargs)
                 exportmethods.setup_table(iterf.types, iterf.header, new)
                 import_iterator(iterf, exportmethods)
                 idx += 1 # this is so failed tables can be reused
@@ -79,6 +76,9 @@ def import_iterator(iterf, dbmethods):
     types = iterf.types
     blocksize = 100000
     buf = []
+
+    if iterf.header_inferred:
+        rowiter.next()
 
     for rowidx, row in enumerate(rowiter):
 

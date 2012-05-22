@@ -110,8 +110,8 @@ def is_url_file(fname, **kwargs):
                 if not is_url(line):
                     return False
         return True
-    except:
-        _log.info(traceback.format_exc())
+    except Exception as e:
+        _log.debug(e)
         return False
 
 def is_html_file(fname, **kwargs):
@@ -121,7 +121,8 @@ def is_html_file(fname, **kwargs):
             return False
         with file(fname, 'r') as f:
             return len(PyQuery(f.read())('table')) > 0
-    except:
+    except Exception as e:
+        _log.debug(e)
         return False
 
 def is_excel_file(fname, **kwargs):

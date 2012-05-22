@@ -2,9 +2,8 @@ import datetime
 
 class BaseMethods(object):
     
-    def __init__(self, tablename, dbname, errfile):
+    def __init__(self, tablename, errfile, **kwargs):
         self.tablename = tablename
-        self.dbname = dbname
         self.errfile = errfile
 
     def setup_table(self, types, header, new=False):

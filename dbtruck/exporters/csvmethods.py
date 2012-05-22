@@ -1,16 +1,19 @@
 import csv
+import os
 
 from base import *
 
 class CSVMethods(BaseMethods):
     def __init__(self, *args, **kwargs):
         BaseMethods.__init__(self, *args, **kwargs)
+        self.outdir = kwargs.get('outdir', './')
         self.outfile = None
         self.writer = None
         self.header = None
 
     def setup_table(self, types, header, new=False):
-        self.outfile = file(self.tablename, 'w' if new else 'a')
+        self.outfile = file(os.path.join(self.outdir, self.tablename),
+                            'w' if new else 'a')
         self.writer = csv.DictWriter(self.outfile, header)
         self.header = header
 
