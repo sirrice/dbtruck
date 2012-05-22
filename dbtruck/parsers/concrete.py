@@ -58,7 +58,7 @@ class CSVFileParser(Parser):
 class OffsetFileParser(Parser):
     def __init__(self, f, fname, **kwargs):
         if 'offset' not in kwargs:
-            s = raw_input('can you give me the offsets to split each row? (otherwise, just press <enter>)\n> ').strip()
+            s = ''#raw_input('can you give me the offsets to split each row? (otherwise, just press <enter>)\n> ').strip()
             offsets = self.parse_offset_str(s)
             if not offsets:
                 raise RuntimeError
