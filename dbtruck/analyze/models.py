@@ -42,7 +42,7 @@ class Metadata(Base):
     @staticmethod
     def load_from_tablename(db, tablename):
         try:
-            tablemd = db_session.query(Metadata).filter(Metadata.tablename == tablename).one()
+            tablemd = db_session.query(Metadata).filter(Metadata.tablename == tablename).all()[0]
         except:
             # add row to metadata table
             tablemd = Metadata(tablename)

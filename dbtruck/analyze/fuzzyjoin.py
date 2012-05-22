@@ -34,20 +34,19 @@ import sys
 import numpy as np
 import pdb
 import traceback
-import xstats.MINE
+#import xstats.MINE
 sys.path.extend(['..', '.', '../exporters'])
 
 
+from itertools import imap
 from geopy import geocoders
 from collections import defaultdict
-from scipy.stats import pearsonr
 
 from models import *
 #from load_data import *
 #from hidden import *
 from dbtruck.exporters.db import *
 import dbtruck.settings as settings
-
 
 
 
@@ -80,7 +79,7 @@ def get_correlations(db, db_session):#, t1, t2):
                 continue
             
             t1, t2 = tmd1.tablename, tmd2.tablename
-            r = np.mean([r1, r2])
+            r = float(np.mean([r1, r2]))
             djoinres = dist_join(db, t1, t2, r)
 
             for corr, statname, col1, col2 in test_correlation(djoinres):
@@ -105,14 +104,13 @@ def test_correlation(join):
     ret = []
     if not join:
         return ret
-    statfuncs = [mine_correlation, pearson_correlation]
     cols = join[0].keys()
     cols.sort()
     for idx, col1 in enumerate(cols):
         for col2 in cols:
             if col1 <= col2:
                 continue
-            for statfunc in statfuncs:
+            for statfunc in __statfuncs__:
                 try:
                     cd1 = [row[col1] for row in join]
                     cd2 = [row[col2] for row in join]
@@ -124,18 +122,42 @@ def test_correlation(join):
                         continue
                     ret.append((corr, statfunc.__name__, col1, col2))
                 except Exception as e:
-                    import pdb
-                    pdb.set_trace()
+                    import traceback
+                    traceback.print_exc()
+                    print e
+                    #import pdb
+                    #pdb.set_trace()
     return ret
 
+
+def pearsonr(x, y):
+  # Assume len(x) == len(y)
+  n = len(x)
+  sum_x = float(sum(x))
+  sum_y = float(sum(y))
+  sum_x_sq = sum(map(lambda x: pow(x, 2), x))
+  sum_y_sq = sum(map(lambda x: pow(x, 2), y))
+  psum = sum(imap(lambda x, y: x * y, x, y))
+  num = psum - (sum_x * sum_y/n)
+  den = pow((sum_x_sq - pow(sum_x, 2) / n) * (sum_y_sq - pow(sum_y, 2) / n), 0.5)
+  if den == 0: return 0
+  return num / den
+
 def pearson_correlation(arr1, arr2):
-    return pearsonr(arr1, arr2)[0]
+    return pearsonr(arr1, arr2)
 
 def mine_correlation(arr1, arr2):
     arr1 = np.array(arr1)
     arr2 = np.array(arr2)
     mic = xstats.MINE.analyze_pair(arr1, arr2)['MIC']    
     return mic
+
+try:
+    import xstats.MINE
+    __statfuncs__ = [mine_correlation, pearson_correlation]
+except:
+    __statfuncs__ = [pearson_correlation]
+    
 
 def run_join(db, t1, t2, r1, r2, s1, s2, prefix):
     if s1 and s2:

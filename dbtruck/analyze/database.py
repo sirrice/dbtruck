@@ -1,8 +1,9 @@
 from sqlalchemy import *
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import *
+import dbtruck.settings as settings
 
-db = create_engine('postgresql://sirrice@localhost:5432/test')
+db = create_engine(settings.DBURI)
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=db))

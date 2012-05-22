@@ -8,10 +8,12 @@ import logging
 import time
 import re
 import pdb
+import traceback
 
 sys.path.append('..')
 sys.path.append( os.path.abspath(os.path.dirname(__file__)) )
 
+import dbtruck.settings as settings
 from collections import *
 from dateutil.parser import parse as dateparse
 from StringIO import StringIO
@@ -31,7 +33,7 @@ class PGMethods(BaseMethods):
 
     def __init__(self, *args, **kwargs):
         super(PGMethods, self).__init__(*args, **kwargs)
-        self.engine = create_engine('postgresql://sirrice@localhost:5432/%s' % self.dbname)
+        self.engine = create_engine(settings.DBURI_PREFIX + self.dbname)
         self.db = self.engine.raw_connection()
 
         # haven't decided if storing state in here is a good idea or
@@ -57,19 +59,20 @@ class PGMethods(BaseMethods):
 
             drop = 'drop table %s cascade;' % self.tablename
             create = 'create table %s (%s);' % (self.tablename, ', \n'.join(cols))            
+            _log.info(create)
             stmts.extend([drop, create])
-        sql = '\n'.join(stmts)
 
         self.types = types
         self.attribute = attrs
-        return sql
+        return stmts
 
     def setup_table(self, types, header, new):
-        createsql = self.sql_create(types, attrs=header, new=new)    
-        with file('/tmp/tmp.create', 'w') as f:
-            print >>f, createsql
-        subprocess.call(['psql', '-f', '/tmp/tmp.create', self.dbname])
-        
+        stmts = self.sql_create(types, attrs=header, new=new)    
+        for stmt in stmts:
+           try:
+               self.engine.execute(stmt)
+           except:
+               _log.info(traceback.format_exc())
 
     def handle_error(self, errcode, col, val, row):
         """
