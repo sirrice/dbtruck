@@ -21,7 +21,6 @@ from util import get_logger, to_utf
 _log = get_logger()
 
 
-
 def import_datafiles(fnames, new, tablename, errfile, exportmethodsklass, parser=None, **kwargs):
     if not parser:
         parser = DBTruckParser('/tmp/', '/tmp/')
@@ -29,7 +28,7 @@ def import_datafiles(fnames, new, tablename, errfile, exportmethodsklass, parser
     try:
         new_errfile = False
         if not errfile:
-            errfile = file('/tmp/dbtruck.errfile', 'a')
+            errfile = file('/dev/null', 'a')
             new_errfile = True
 
         if isinstance(fnames, basestring):

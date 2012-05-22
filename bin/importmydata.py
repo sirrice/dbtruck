@@ -30,9 +30,16 @@ if __name__ == '__main__':
     _log = get_logger(fname=args.logfile, plevel=plevel)
 
 
+    dbsettings = {
+    'dbname' : 'test',
+    'hostname' : 'localhost',
+    'username' : 'sirrice',
+    'port' : 5432,
+    }
+
+
     import_datafiles(fnames, not args.append, tablename, errfile, PGMethods,
-                     dbname=dbname,
-                     hostname="localhost:5432")
+                     **dbsettings)
     errfile.close()
 
 # potential options

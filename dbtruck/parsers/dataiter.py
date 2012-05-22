@@ -95,11 +95,12 @@ class DataIterator(object):
             return
 
         newheader = []
+        timesseen = Counter()
         attridx = 0
         for value in header:
             try:
                 ret = re_nonasciistart.sub('', re_space.sub('_', re_nonascii.sub('', value.strip()).strip()))
-                ret = to_utf(ret).lower()
+                ret = to_utf(ret)
                 if not ret:
                     ret = 'attr%d' % attridx
                 if re.match('\d+', ret):
@@ -108,7 +109,14 @@ class DataIterator(object):
                 _log.info('clean_header\t%s', value)
                 ret = 'attr%d' % attridx
             attridx += 1
-            newheader.append(ret.lower())
+            ret = ret.lower()
+            if timesseen[ret] > 0:
+                newheader.append('%s_%d' % (ret, timesseen[ret]))
+            elif timesseen[ret] > 3:
+                break
+            else:
+                newheader.append(ret)
+            timesseen[ret] += 1
 
         # XXX: ensure that header doesn't have overlapping values
         if len(set(newheader)) < len(newheader):

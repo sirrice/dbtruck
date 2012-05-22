@@ -16,12 +16,11 @@ sys.path.append( os.path.abspath(os.path.dirname(__file__)) )
 from collections import *
 from dateutil.parser import parse as dateparse
 from StringIO import StringIO
-
-from ..util import get_logger, to_utf
-from util import block_iter
-from infertypes import *
 from sqlalchemy import *
-from base import BaseMethods
+
+from dbtruck.util import get_logger, to_utf, block_iter
+from dbtruck.infertypes import *
+from dbtruck.exporters.base import BaseMethods
 
 _log = get_logger()
 copy_re = re.compile('line (?P<line>\d+), column\ (?P<col>\w+): \"(?P<val>.+)\"')
@@ -35,7 +34,15 @@ class PGMethods(BaseMethods):
 
         self.dbname = kwargs['dbname']
         self.hostname = kwargs.get('hostname', 'localhost')
-        self.engine = create_engine('postgresql://%s/%s' % (self.hostname, self.dbname))
+        self.username = kwargs.get('user', '')
+        self.password = kwargs.get('password', None)
+        self.port = kwargs.get('port', 0)
+
+        self.dburi = kwargs.get('uri', None)
+        if not self.dburi:
+            self.dburi = self.construct_dburi()
+            
+        self.engine = create_engine(self.dburi)
         self.db = self.engine.raw_connection()
 
         # haven't decided if storing state in here is a good idea or
@@ -45,7 +52,20 @@ class PGMethods(BaseMethods):
 
         self.prev_errors = defaultdict(list)
         self.threshold = 10
-        
+
+    def construct_dburi(self):
+        dburi = ['postgresql://']
+        if self.username:
+            dburi.append(self.username)
+            if self.password:
+                dburi.extend([':', self.password])
+            dburi.append('@')
+        dburi.append(self.hostname)
+        if self.port:
+            dburi.append(':%s' % str(self.port))
+        dburi.extend(['/', self.dbname])
+        return ''.join(dburi)
+
 
     def sql_create(self, types, attrs=None, new=True):
         # make up some attribute names
