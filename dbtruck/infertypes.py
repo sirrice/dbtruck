@@ -20,7 +20,7 @@ def get_type(val):
     val = val.strip()
     if not val: return None
 
-    numval = re_num_bad_chars.replace('', val)
+    numval = re_num_bad_chars.sub('', val)
     
     try:
         i = int(numval)
@@ -94,7 +94,7 @@ def str2sqlval((t, val)):
     
     
     if t == int or t == float:
-        numval = re_num_bad_chars.replace('', val)
+        numval = re_num_bad_chars.sub('', val)
         try:    
             if t == int:
                 return int(numval)
