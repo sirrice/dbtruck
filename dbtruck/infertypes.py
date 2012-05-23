@@ -11,6 +11,8 @@ from dateutil.parser import parse as dateparse
 # notes: alter table readings alter column time type time using (time::time);
 
 re_null_chars = re.compile('[\*\.\?-_]+')
+re_num_bad_chars = re.compile('[\,\$\@\#\*]')
+
 
 def get_type(val):
     if not isinstance(val, basestring):
@@ -18,16 +20,23 @@ def get_type(val):
     val = val.strip()
     if not val: return None
 
+    numval = re_num_bad_chars.replace('', val)
+    
     try:
-        i = int(val)
+        i = int(numval)
         return int
     except:
         pass
     try:
-        f = float(val)
+        f = float(numval)
         return float
     except:
-        pass
+        try:
+            if numval.endswith('%'):
+                float(numval[:-1])
+                return float
+        except:
+                pass
 
     try:
         d = dateparse(val)
@@ -82,15 +91,24 @@ def str2sqlval((t, val)):
     # except:
     #     pass
 
-    try:
-        if t == int:
-            return int(val)
-        if t == float:
-            return float(val)
-    except:
-        if not nullval:
-            return None
-        return 0
+    
+    
+    if t == int or t == float:
+        numval = re_num_bad_chars.replace('', val)
+        try:    
+            if t == int:
+                return int(numval)
+            if t == float:
+                return float(numval)
+        except:
+            if t == float and numval.endswith('%'):
+                try:
+                    return float(numval[:-1])
+                except:
+                    pass
+            if not nullval:
+                return None
+            return 0
 
     if not nullval:
         return None
