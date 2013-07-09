@@ -82,16 +82,18 @@ class DBTruckParser(object):
 
                     
     def get_readers_from_text_file(self, fname, **kwargs):
-        text_parsers = [CSVFileParser, JSONParser]        
+        text_parsers = [CSVFileParser, JSONParser, InferOffsetFileParser]        
         bestparser, bestperc, bestncols = None, 0., 1
         for parser in text_parsers:
             try:
+                _log.info("trying text reader:  %s", str(parser))
                 with file(fname, 'rb') as f:
                     p = parser(f, fname, **kwargs)
                     i = p.get_data_iter()
                     perc_maj, ncols = rows_consistent(i())
                     if perc_maj > bestperc and perc_maj > 0.6 and ncols > bestncols:
                         bestparser, bestperc, bestncols = parser, perc_maj, ncols
+                        _log.info("set best parser to %s", parser)
             except KeyboardInterrupt:
                 pass
             except Exception as e:

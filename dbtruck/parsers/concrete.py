@@ -55,6 +55,8 @@ class CSVFileParser(Parser):
             return DataIterator(lambda: _get_reader(self.f, bestdelim), fname=self.fname)
         raise "Could not parse using CSV"
 
+
+
 class OffsetFileParser(Parser):
     def __init__(self, f, fname, **kwargs):
         if 'offset' not in kwargs:
@@ -69,6 +71,9 @@ class OffsetFileParser(Parser):
         super(OffsetFileParser, self).__init__(f, fname, **kwargs)
 
     def parse_offset_str(self, s):
+        """
+        look for groups of numbers (offsets) delimited by non a-z characters
+        """
         if not s:
             return None
         if re.search('[a-zA-Z]', s):
@@ -94,11 +99,59 @@ class OffsetFileParser(Parser):
         offpairs = zip(self.offsets[:-1], self.offsets[1:])
         def _f():
             self.f.seek(0)
-            for line in f:
+            for line in self.f:
                 line = line.strip()
                 arr = [line[s:e] if s < len(line) else '' for s,e in offpairs]
                 yield arr
         return DataIterator(_f, fname=self.fname)
+
+class InferOffsetFileParser(OffsetFileParser):
+  def __init__(self, f, fname, **kwargs):
+    Parser.__init__(self, f, fname, **kwargs)
+
+    self.offsets = self.infer_offsets()
+    if not self.offsets:
+      raise RuntimeError
+
+    _log.info("inferoffset got offsets: %s", self.offsets)
+
+
+  def infer_offsets(self):
+    f = self.f
+    f.seek(0)
+    l = f.readline()
+    l = re.sub("^[^[:ascii:]]+", "", l)
+    l = re.sub("[^[:ascii:]]+$", "", l)
+    get_start_idxs = lambda l: [i.start() for i in re.finditer("[^\s]+", l)]
+
+    startIdxs = get_start_idxs(l)
+    candidates = Counter(startIdxs)
+    _log.info("inferoffset candidates: %s", sorted(candidates.keys()))
+
+    # in the first 100 rows, are any of the candidates consistently matched?
+    nlines = 0
+    for l in f:
+      candidates.update(filter(candidates.has_key, get_start_idxs(l)))
+      if nlines >= 100:
+        break
+      nlines += 1
+
+    _log.info("inferoffset nlines: %s", nlines)
+    _log.info("inferoffset counts: %s", sorted(candidates.items()))
+
+    # if there are a set of indexs that are > 99%-1 matched, then they are good offsets
+    offsets = []
+    for idx, count in candidates.iteritems():
+      if count >= math.ceil(nlines * .99) - 1:
+        offsets.append(idx)
+
+
+    if len(offsets) > 2:
+      return sorted(offsets)
+    return None
+
+
+
 
 class SingleColumnParser(Parser):
     def get_data_iter(self):

@@ -93,6 +93,7 @@ def import_iterator(iterf, dbmethods):
 
         if len(buf) > 0 and len(buf) % blocksize == 0:
             try:
+                _log.info("flushing %s rows", len(buf))
                 success = dbmethods.import_block(buf, iterf)
             except Exception as e:
                 _log.warn(traceback.format_exc())

@@ -31,7 +31,9 @@ class DataIterator(object):
         _log.info( 'headers:\t%s', ' '.join(self.header))        
 
     def infer_header(self):
-        "validate, infer/generate a header for this iterator"
+        """
+        validate, infer/generate a header for this iterator
+        """
 
         # if all things fail, we can always make up headers!
         try:
@@ -72,13 +74,17 @@ class DataIterator(object):
         
         try:
             header = self().next()
+            header = [s.strip() for s in header]
+            _log.info("checking header: %s", header)
             htypes = map(get_type, header)
             matches = sum([ht == t and ht != None and t != str for ht, t in zip(htypes, types)])
+            _log.info("matches: %s", matches)
 
             if matches > 0:
                 return 
 
             if max(map(len, header)) > 100:
+                _.log.warn("header colname longer than 100: %s", max(map(len, header)))
                 return 
 
             # lots of more complex analysis goes HERE
