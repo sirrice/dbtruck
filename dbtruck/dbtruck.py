@@ -22,6 +22,7 @@ _log = get_logger()
 
 
 def import_datafiles(fnames, new, tablename, errfile, exportmethodsklass, parser=None, **kwargs):
+    _log.info("kwargs: %s", kwargs)
     if not parser:
         parser = DBTruckParser('/tmp/', '/tmp/')
 

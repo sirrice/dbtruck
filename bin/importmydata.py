@@ -16,14 +16,20 @@ if __name__ == '__main__':
                         help='destination to log debug messages')
     parser.add_argument('--append', action='store_true', dest='append', default=False,
                         help='replace existing table or append to it')
+    parser.add_argument('--user', dest='user', default="sirrice",
+                        help='database user (if applicable)')
+    parser.add_argument('--port', dest='port', default=5432,
+                        help='database port (if applicable)')
     parser.add_argument('-d', action='store_true', dest='debug', default=False,
                         help='print debug messages to stdout')
     parser.add_argument('tname', nargs=1, help='tablename')
-    parser.add_argument('dbname', nargs=1, help='database name')
+    parser.add_argument('dbname', nargs=1, help='database name', default="test")
     parser.add_argument('fnames', nargs='+', help='data file name')
     args = parser.parse_args()
 
     tablename, dbname, fnames = args.tname[0], args.dbname[0], args.fnames
+    dbuser = args.user
+    dbport = args.port and int(args.port) or 5432 
     errfile = file(args.errfile, 'w')
 
     plevel = logging.DEBUG if args.debug else logging.WARNING
@@ -31,10 +37,10 @@ if __name__ == '__main__':
 
 
     dbsettings = {
-    'dbname' : 'test',
+    'dbname' : dbname,
     'hostname' : 'localhost',
-    'username' : 'sirrice',
-    'port' : 5432,
+    'username' : dbuser,
+    'port' : dbport,
     }
 
 
