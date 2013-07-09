@@ -100,7 +100,6 @@ class OffsetFileParser(Parser):
         def _f():
             self.f.seek(0)
             for line in self.f:
-                line = line.strip()
                 arr = [line[s:e] if s < len(line) else '' for s,e in offpairs]
                 yield arr
         return DataIterator(_f, fname=self.fname)
@@ -115,13 +114,17 @@ class InferOffsetFileParser(OffsetFileParser):
 
     _log.info("inferoffset got offsets: %s", self.offsets)
 
+  def remove_nonascii(self, l):
+    l = re.sub("^[^\x00-\x7F]+", "", l)
+    l = re.sub("[^\x00-\x7F]+$", "", l)
+    return l
+
 
   def infer_offsets(self):
     f = self.f
     f.seek(0)
-    l = f.readline()
-    l = re.sub("^[^[:ascii:]]+", "", l)
-    l = re.sub("[^[:ascii:]]+$", "", l)
+    # remove bad characetrs from the "header" row
+    l = self.remove_nonascii(f.readline())
     get_start_idxs = lambda l: [i.start() for i in re.finditer("[^\s]+", l)]
 
     startIdxs = get_start_idxs(l)
@@ -151,6 +154,16 @@ class InferOffsetFileParser(OffsetFileParser):
     return None
 
 
+  def get_data_iter(self):
+    offpairs = zip(self.offsets[:-1], self.offsets[1:])
+    def _f():
+      self.f.seek(0)
+      for idx, line in enumerate(self.f):
+        if idx == 0:
+          line = self.remove_nonascii(line)
+        arr = [line[s:e] if s < len(line) else '' for s,e in offpairs]
+        yield arr
+    return DataIterator(_f, fname=self.fname)
 
 
 class SingleColumnParser(Parser):
