@@ -38,22 +38,41 @@ class Parser(object):
 
 
 class CSVFileParser(Parser):
+    def __init__(self, f, fname, **kwargs):
+        Parser.__init__(self, f, fname, **kwargs)
+        self.dialect = None
+
     def get_data_iter(self):
         # CSV/delimiter based lines
         # return a function that returns iter
+        self.f.seek(0)
+        if self.dialect is None:
+          self.dialect = dialect = csv.Sniffer().sniff(self.f.read(15000))
+          self.f.seek(0)
 
-        DELIMITERS = [' ', ',', ';', '\t', '-', ' - ', '=', ' = ']
-        bestdelim, bestperc, bestncols = None, 0., 0
-        for delim in DELIMITERS:
-            perc_maj, ncols =  rows_consistent(_get_reader(self.f, delim))
-            _log.debug("csvparser\t'%s'\tperc(%.3f)\tncols(%d)", delim, perc_maj, ncols )
-            if ((ncols <= bestncols and perc_maj > 1.5 * bestperc) or
-                (ncols > bestncols and bestperc - perc_maj < 0.1)):                
-                bestdelim, bestperc, bestncols = delim, perc_maj, ncols
-        if bestncols:
-            _log.debug("csvparser\tbest delim\t'%s'\tncols(%d)", bestdelim, bestncols )
-            return DataIterator(lambda: _get_reader(self.f, bestdelim), fname=self.fname)
-        raise "Could not parse using CSV"
+        if not self.dialect:
+          raise "Could not parse using CSV"
+
+        def _reader():
+          self.f.seek(0)
+          return csv.reader(self.f, dialect)
+        return DataIterator(_reader, fname=self.fname)
+
+
+        # Deprecated, just use csv.Sniffer instead of this
+
+        # DELIMITERS = [' ', ',', ';', '\t', '-', ' - ', '=', ' = ']
+        # bestdelim, bestperc, bestncols = None, 0., 0
+        # for delim in DELIMITERS:
+        #     perc_maj, ncols =  rows_consistent(_get_reader(self.f, delim))
+        #     _log.debug("csvparser\t'%s'\tperc(%.3f)\tncols(%d)", delim, perc_maj, ncols )
+        #     if ((ncols <= bestncols and perc_maj > 1.5 * bestperc) or
+        #         (ncols > bestncols and bestperc - perc_maj < 0.1)):                
+        #         bestdelim, bestperc, bestncols = delim, perc_maj, ncols
+        # if bestncols:
+        #     _log.debug("csvparser\tbest delim\t'%s'\tncols(%d)", bestdelim, bestncols )
+        #     return DataIterator(lambda: _get_reader(self.f, bestdelim), fname=self.fname)
+        # raise "Could not parse using CSV"
 
 
 

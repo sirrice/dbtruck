@@ -69,29 +69,32 @@ def get_row_counts(iter):
         print "Iteration ended at row %d" % (idx+1)
 
 
-def _get_reader(f, delim):
-    """
-    creates an CSV based iterator
-    """
-    f.seek(0)
-    f = (line.strip() for line in f)
-    if delim is None:
-        reader = csv.reader(f)
-    elif len(delim) == 1:
-        reader = csv.reader(f, delimiter=delim)
-    else:
-        reader = (r.split(delim) for r in f)
 
-    try:
-        while True:
-            try:
-                yield reader.next()
-            except StopIteration:
-                break
-            except Exception as e:
-                _log.info(traceback.format_exc())                
-    except:
-        _log.info(traceback.format_exc())                
+# Deprecated thanks to csv.Sniffer
+#
+# def _get_reader(f, delim):
+#     """
+#     creates an CSV based iterator
+#     """
+#     f.seek(0)
+#     f = (line.strip() for line in f)
+#     if delim is None:
+#         reader = csv.reader(f)
+#     elif len(delim) == 1:
+#         reader = csv.reader(f, delimiter=delim)
+#     else:
+#         reader = (r.split(delim) for r in f)
+# 
+#     try:
+#         while True:
+#             try:
+#                 yield reader.next()
+#             except StopIteration:
+#                 break
+#             except Exception as e:
+#                 _log.info(traceback.format_exc())                
+#     except:
+#         _log.info(traceback.format_exc())                
 
 
 
