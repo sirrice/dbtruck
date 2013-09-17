@@ -22,7 +22,6 @@ from StringIO import StringIO
 
 from dataiter import DataIterator
 from dbtruck.util import get_logger, to_utf
-from dbtruck.parsers.util import _get_reader
 from dbtruck.parsers.util import *
 
 
