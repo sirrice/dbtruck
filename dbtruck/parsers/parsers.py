@@ -33,6 +33,11 @@ class DBTruckParser(object):
         self.zipdirname = zipdirname
         self.dldirname = dldirname
 
+    def get_reader(self, fname, **kwargs):
+      #if not isinstance(fname, basestring):
+      #  raise Exception("get_reader got list as argument.  expected string: %s" % fname)
+      return self.get_readers(fname, **kwargs)
+
     def get_readers(self, fname, **kwargs):
         """
         @return a list of functions that return row iterators.  This is so files such as HTML

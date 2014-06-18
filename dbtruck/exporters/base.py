@@ -9,6 +9,9 @@ class BaseMethods(object):
     def setup_table(self, types, header, new=False):
         raise
 
+    def get_max_id(self):
+        return 0
+
     def import_block(self, buf, iterf):
         raise 
 

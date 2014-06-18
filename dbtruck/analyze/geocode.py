@@ -1,6 +1,6 @@
 import pickle
 import re
-import bsddb3
+import bsddb
 
 from geopy import geocoders
 
@@ -14,7 +14,7 @@ def distance_func(pt1, pt2):
 class DBTruckGeocoder(object):
     def __init__(self, fname='/tmp/geocache.bdb'):
         try:
-            self.cache = bsddb3.hashopen(fname)
+            self.cache = bsddb.hashopen(fname)
         except:
             self.cache = {}
         try:

@@ -96,6 +96,13 @@ class PGMethods(BaseMethods):
            except:
                _log.info(traceback.format_exc())
 
+    def get_max_id(self):
+      try:
+        res = self.engine.execute("select max(id) from %s" % self.tablename)
+        return res.fetchone()[0]
+      except:
+        return 0
+
     def handle_error(self, errcode, col, val, row):
         """
         This method caches the data that caused import errors in memory, and alters the schema
