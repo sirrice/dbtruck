@@ -347,7 +347,12 @@ class HTMLTableParser(Parser):
     the text within each td and th is used as the content of the table
     assumes that th is always and only used as the table's header
     """
-    from pyquery import PyQuery
+    try:
+      from pyquery import PyQuery
+    except:
+      print >>sys.stderr, "could not import pyquery"
+      return None
+
     def get_data_iter(self):
         self.f.seek(0)
         table = PyQuery(self.f.read())

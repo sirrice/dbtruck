@@ -117,7 +117,11 @@ def is_url_file(fname, **kwargs):
         return False
 
 def is_html_file(fname, **kwargs):
-    from pyquery import PyQuery
+    try:
+        from pyquery import PyQuery
+    except:
+        print >>sys.stderr, "could not import pyquery"
+        return False
     try:
         size = os.path.getsize(fname)
         if size > 1048576 * 4:

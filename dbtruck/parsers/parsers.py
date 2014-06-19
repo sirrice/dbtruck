@@ -125,7 +125,12 @@ class DBTruckParser(object):
 
 
     def find_ideal_tables(self, tables):
-        from pyquery import PyQuery
+        try:
+            from pyquery import PyQuery
+        except:
+            print >>sys.stderr, "could not import pyquery"
+            return []
+
         rm = []
         for table in tables:
             found = False        
@@ -145,7 +150,12 @@ class DBTruckParser(object):
         return ret
 
     def get_readers_from_html_content(self, fname, html, **kwargs):
-        from pyquery import PyQuery
+        try:
+            from pyquery import PyQuery
+        except:
+            print >>sys.stderr, "could not import pyquery"
+            return []
+
         parsers = []
         pq = PyQuery(html)
         tables = self.find_ideal_tables(pq('table'))
