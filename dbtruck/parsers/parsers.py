@@ -16,7 +16,6 @@ import itertools
 from operator import and_
 from collections import *
 from dateutil.parser import parse as dateparse
-from pyquery import PyQuery
 from openpyxl import load_workbook
 from StringIO import StringIO
 
@@ -126,6 +125,7 @@ class DBTruckParser(object):
 
 
     def find_ideal_tables(self, tables):
+        from pyquery import PyQuery
         rm = []
         for table in tables:
             found = False        
@@ -145,6 +145,7 @@ class DBTruckParser(object):
         return ret
 
     def get_readers_from_html_content(self, fname, html, **kwargs):
+        from pyquery import PyQuery
         parsers = []
         pq = PyQuery(html)
         tables = self.find_ideal_tables(pq('table'))

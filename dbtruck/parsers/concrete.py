@@ -16,7 +16,6 @@ import itertools
 from operator import and_
 from collections import *
 from dateutil.parser import parse as dateparse
-from pyquery import PyQuery
 from openpyxl import load_workbook
 from StringIO import StringIO
 
@@ -348,6 +347,7 @@ class HTMLTableParser(Parser):
     the text within each td and th is used as the content of the table
     assumes that th is always and only used as the table's header
     """
+    from pyquery import PyQuery
     def get_data_iter(self):
         self.f.seek(0)
         table = PyQuery(self.f.read())

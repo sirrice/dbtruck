@@ -19,6 +19,6 @@ setup(name="dbtruck",
       package_dir = {'dbtruck' : 'dbtruck'},
       scripts = ['bin/importmydata.py'],
       package_data = { 'dbtruck' : ['data/*'] },
-      install_requires = ['xlrd', 'pyxl', 'argparse', 'DateUtils', 
-			  'geopy', 'openpyxl', 'requests', 'pyquery', "sqlalchemy", "lxml", "psycopg2"],
+      install_requires = ['xlrd', 'pyxl', 'openpyxl', 'argparse', 'DateUtils', 
+			  'geopy',  'requests', "sqlalchemy", "psycopg2"],
       keywords= "library query db import")

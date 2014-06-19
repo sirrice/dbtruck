@@ -11,7 +11,6 @@ import traceback
 
 from operator import and_
 from collections import *
-from pyquery import PyQuery
 from openpyxl import load_workbook
 from dateutil.parser import parse as dateparse
 
@@ -118,6 +117,7 @@ def is_url_file(fname, **kwargs):
         return False
 
 def is_html_file(fname, **kwargs):
+    from pyquery import PyQuery
     try:
         size = os.path.getsize(fname)
         if size > 1048576 * 4:
