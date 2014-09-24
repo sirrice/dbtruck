@@ -40,11 +40,14 @@ class GlobalLogger(object):
         self._logger.setLevel(logging.DEBUG)
 
 
-        fh = logging.FileHandler(fname)
-        fh.setLevel(flevel)
-        fh.setFormatter(self.formatter)
-        fh.set_name('filehandler')
-        self._logger.addHandler(fh)
+        try:
+            fh = logging.FileHandler(fname)
+            fh.setLevel(flevel)
+            fh.setFormatter(self.formatter)
+            fh.set_name('filehandler')
+            self._logger.addHandler(fh)
+        except:
+          pass
 
         ph = logging.StreamHandler(sys.stdout)
         ph.setLevel(plevel)
