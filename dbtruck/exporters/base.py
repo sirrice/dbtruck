@@ -33,4 +33,4 @@ class BaseMethods(object):
             return 'int'
         if t == float:
             return 'float'
-        return 'varchar(128)'
+        return 'text'

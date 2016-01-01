@@ -28,6 +28,7 @@ def file_iterators(fnames, parser=None, **kwargs):
   if isinstance(fnames, basestring):
         fnames = [fnames]
 
+  print fnames
   iterfs = parser.get_reader(fnames)
   iterfs = [iterf for iterf in iterfs]
   for iterf in iterfs:
@@ -61,7 +62,7 @@ def import_datafiles(fnames, new, tablename, errfile, exportmethodsklass, parser
         exportmethods = exportmethodsklass(tablename, errfile, **kwargs)
 
         newtable = new and idx == 0
-        exportmethods.setup_table(iterf.types, iterf.header, newtable)
+        exportmethods.setup_table(iterf.types, iterf.header, iterf.add_id_col, newtable)
         import_iterator(iterf, exportmethods)
 
         idx += 1 # this is so failed tables can be reused

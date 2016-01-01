@@ -28,6 +28,12 @@ _log = get_logger()
 
 
 class DBTruckParser(object):
+    """
+    Exhaustively tries the available parsers one at a time until it finds one that
+    seems to parse the file into a rectangular-enough table-like structure.
+
+    Returns an iterator over file readers.  Each file reader is a tuple iterator
+    """
     def __init__(self, zipdirname, dldirname):
         self.zipdirname = zipdirname
         self.dldirname = dldirname
@@ -46,7 +52,7 @@ class DBTruckParser(object):
         #      http://www.garykessler.net/library/file_sigs.html
         _log.info("processing\t%s", fname)
 
-        if isinstance(fname, list) or isinstance(fname, set):
+        if isinstance(fname, list) or isinstance(fname, set) or isinstance(fname, tuple):
             return itertools.chain(*map(self.get_readers, fname))
         elif is_url(fname):
             return self.get_readers_from_url(fname)

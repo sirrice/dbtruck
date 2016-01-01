@@ -5,10 +5,9 @@ except ImportError:
     import ez_setup
     ez_setup.use_setuptools()
 from setuptools import setup, find_packages
-import dbtruck
 
 setup(name="dbtruck",
-      version=dbtruck.__version__,
+      version="0.0.8",
       description="Dump your data into your database",
       license="MIT",
       author="Eugene Wu",
@@ -19,6 +18,8 @@ setup(name="dbtruck",
       package_dir = {'dbtruck' : 'dbtruck'},
       scripts = ['bin/importmydata.py'],
       package_data = { 'dbtruck' : ['data/*'] },
-      install_requires = ['xlrd', 'openpyxl', 'argparse', 'DateUtils', 
-			  'geopy',  'requests', "sqlalchemy", "psycopg2"],
+      install_requires = [
+        'xlrd', 'openpyxl', 'click', 'DateUtils', 
+			  'geopy',  'requests', "sqlalchemy", "psycopg2"
+      ],
       keywords= "library query db import")

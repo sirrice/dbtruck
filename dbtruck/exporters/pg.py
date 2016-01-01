@@ -67,14 +67,14 @@ class PGMethods(BaseMethods):
         return ''.join(dburi)
 
 
-    def sql_create(self, types, attrs=None, new=True):
+    def sql_create(self, types, attrs=None, add_id_col=False, new=True):
         # make up some attribute names
         types = map(BaseMethods.type2str, types)
         stmts = []
         if new:
             cols = []
             for attr, t in zip(attrs, types):
-                if attr == 'id':
+                if attr == 'id' and add_id_col:
                     cols.append('id serial unique')
                 else:
                     cols.append('%s %s null' % (attr, t))
@@ -88,8 +88,8 @@ class PGMethods(BaseMethods):
         self.attribute = attrs
         return stmts
 
-    def setup_table(self, types, header, new):
-        stmts = self.sql_create(types, attrs=header, new=new)    
+    def setup_table(self, types, header, add_id_col, new):
+        stmts = self.sql_create(types, attrs=header, add_id_col=add_id_col, new=new)    
         for stmt in stmts:
            try:
                self.engine.execute(stmt)
@@ -130,9 +130,11 @@ class PGMethods(BaseMethods):
             # 22001: make column size longer
             # 22007: change column into varchar
             # 22P02: integer column but got string
-            newlen = max(64, max(map(len, map(to_utf, vals))) * 2)
-            newtype = 'varchar(%d)' % newlen if newlen <= 1024 else 'text'
-            query = "alter table %s alter %s type %s" % (self.tablename, col, newtype)
+            # ewu: new string default of "text" type means these errors should not happen
+            pass
+            #newlen = max(64, max(map(len, map(to_utf, vals))) * 2)
+            #newtype = 'varchar(%d)' % newlen if newlen <= 1024 else 'text'
+            #query = "alter table %s alter %s type %s" % (self.tablename, col, newtype)
 
 
         if query:

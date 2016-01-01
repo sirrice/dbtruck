@@ -11,6 +11,11 @@ re_nonasciistart = re.compile('^[^\w]')
 _log = get_logger()
 
 class DataIterator(object):
+    """
+    Wrapper around a file reader.
+    Intantiated with an iter_func function that returns a fresh tuple iterator over inputs.
+    Provides analysis for type and header detection
+    """
     def __init__(self, iter_func, **kwargs):
         self.iter_func = iter_func
         self.fname = None
@@ -32,7 +37,8 @@ class DataIterator(object):
 
     def infer_header(self):
         """
-        validate, infer/generate a header for this iterator
+        validate and infer a header for this tuple iterator.
+        If it all fails, just generate a header 
         """
 
         # if all things fail, we can always make up headers!
@@ -96,6 +102,11 @@ class DataIterator(object):
 
 
     def clean_header(self):
+        """
+        Given a header row, makes it database friendly e.g.,
+        1) remove spaces and weird characters
+        2) shorten to a reasonable length
+        """
         header = self.header
         if not header:
             return
@@ -133,6 +144,10 @@ class DataIterator(object):
 
 
     def validate_header(self):
+        """
+        Make sure header at least has the same number of elements as the most
+        popular row, otherwise disqualify
+        """
         if self.header:
             c = Counter()
             for idx, row in enumerate(self()):
