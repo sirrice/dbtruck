@@ -16,7 +16,7 @@ setup(name="dbtruck",
       include_package_data = True,      
       packages = find_packages(),
       package_dir = {'dbtruck' : 'dbtruck'},
-      scripts = ['bin/importmydata.py'],
+      scripts = ['bin/importmydata.py', 'bin/fixschema.py'],
       package_data = { 'dbtruck' : ['data/*'] },
       install_requires = [
         'xlrd', 'openpyxl', 'click', 'DateUtils', 
