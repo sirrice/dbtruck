@@ -180,10 +180,23 @@ class SchemaFixer(cmd.Cmd):
     pass
 
   def do_c(self, uri):
+    """
+    Connect to database using URI.  The latter assumes localhost
+
+    connect [URI]
+    connect [tablename]
+    """
     return self.do_connect(uri)
 
   @err_wrapper
   def do_connect(self, uri):
+    """
+    Connect to database using URI.  The latter assumes localhost
+
+      connect [URI]
+      connect [tablename]
+    """
+
     uri = uri.strip()
     if "://" in uri:
       self.dburi = uri
@@ -203,6 +216,8 @@ class SchemaFixer(cmd.Cmd):
   def do_tables(self, line):
     """
     list tables
+
+      tables
     """
     self.cmds.append(dict(cmd="tables"))
 
@@ -224,7 +239,10 @@ class SchemaFixer(cmd.Cmd):
   @err_wrapper
   def do_cols(self, line):
     """
-    list tables
+    list columns in table.  The latter looks for a previously used table argument.
+
+      cols [table]
+      cols
     """
     args = self.read_args(line, "table")
     if not args: return
@@ -258,6 +276,13 @@ class SchemaFixer(cmd.Cmd):
 
   @err_wrapper
   def do_data(self, line):
+    """
+    Show example data for each column in the table
+
+      data [table]
+      data
+
+    """
     args = self.read_args(line, "table")
     if not args: return
     table, = args
@@ -280,6 +305,13 @@ class SchemaFixer(cmd.Cmd):
 
   @err_wrapper
   def do_infer(self, line):
+    """
+    Infer the data type for specified column
+
+      infer [table] [col]
+      infer [col]
+      infer
+    """
     args = self.read_args(line, "table", "col")
     if not args: return
     table, col = args
@@ -290,6 +322,13 @@ class SchemaFixer(cmd.Cmd):
 
   @err_wrapper
   def do_col(self, line):
+    """
+    List summary info about column
+
+      col [table] [col]
+      col [col]
+      col
+    """
     args = self.read_args(line, "table", ("newname", "col"))
     if not args: return
     table, col = args
@@ -302,9 +341,11 @@ class SchemaFixer(cmd.Cmd):
   @err_wrapper
   def do_rename(self, line):
     """
-    rename [table] [col] [new name]
-    rename [col] [new name]
-    rename [new name]
+    Rename column
+
+      rename [table] [col] [new name]
+      rename [col] [new name]
+      rename [new name]
 
     uses the closest matching command to infer the table and col values
     """
@@ -333,9 +374,12 @@ class SchemaFixer(cmd.Cmd):
   @err_wrapper
   def do_type(self, line):
     """
-    type [table] [col] [new type]
-    type [col] [new type]
-    type [new type]
+    Change the type of the column.  If type coersion fails, prompts user for explicit
+    USING expression
+
+      type [table] [col] [new type]
+      type [col] [new type]
+      type [new type]
 
     uses the closest matching command to infer the table and col values
     """
