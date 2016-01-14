@@ -35,14 +35,74 @@ machine, and uses `psql` to load data.
 
 # Installation
 
-The installation should install an executable called `importmydata.py` into your path:
+I recommend installing dbtruck in a virtualenv environment.  You can use pip to install dbtruck:
 
-    python setup.py install
+    pip install dbtruck
+
+This will install two scripts into your path -- `importmydata.py` and `fixschema.py`.  
+The former is used to import data files into the database, and the latter can be used
+to quickly look at data in your database and rename/retype attributes.
 
 # Usage
 
+For importmydata:
+
     importmydata.py -h
     importmydata.py data/testfile.txt tablename dbname
+
+Running fixschema opens a prompt that supports commands.  The following is an example of
+a session using fixschema:
+
+      fixschema.py
+
+      Schema Fixer is a simple interactive prompt for viewing your database
+      and renaming attributes in your tables.
+
+
+      Context: {}
+      > connect test
+      assuming test is database name and connecting to postgresql://localhost/test
+
+      Context: {}
+      > tables
+      printing
+                          a  2           actedin  2            actors  3
+                          b  3  csp_perrow_aug10 11  csp_perrow_oct14 11
+        csp_perrow_oct14_agg 12               fec 18            ground 31
+                      india 31            movies  3               pcm 32
+                    sailors  1            states  2             times  3
+                          us 31          zipcodes  9
+
+      Context: {}
+      > cols times
+        227  character varying        wid    inferred str
+          1  character varying  hittypeid    inferred str
+        323   double precision          t  inferred float
+
+      Context: {'table': 'times'}
+      > col wid
+      Args used from Context: table = times
+
+      times.wid character varying     inferred type str
+
+        A9S1BY9MWXXZGBV  AT83AJM75Q8NNC8  A898X2BT3PN03LR  AXFM9RGKY2I26U5
+        AONOWZ7O27B0SG2  A5X4LXE3QF81IQJ  AFO8DX2JVVP1D08  A4F7CZYSA1HQGKO
+        A5Z3RNTYZGXY02B  AEW8WKVAMFOXNPU  ANQKKE0T4K7M6IN  AE2XCOMRJP77LAL
+        A6X5UAD2CJC3ZKM  AHPTFIPLCBKL59H  AX599ENLZL403QB  ATW3FTREUWEY7LV
+        A3XP57KTJAZNSJ8  AI86KEPNR7B8BBT  AXM7QGPWTS887I1  AAX804A3G334LW8
+        AB54WA1G2ACEOFN  ADT3GN8G9KKCJHK  A4IB1WR87KI34GD  A1N18Y83VOHEWBD
+        AYJFL6YB1JG8KP2  ARF4T3MT5AEQVXP  AX1TCT4R31BI6YO  AZKCX0XVAHSU3JS
+        AK1ACNTS5LJLMGQ  AP1BBGGSM9QKBEZ  AVF8T1U29Z9MNPS  AK8THL0QCYKHDF7
+        AL3K2PL54YS6LGY  AU8JXZYMNKFMLBQ  AZ9MHGKX5SKGVL3  AS5MC33Q619AI02
+        A1Z3L2G9L3HBKN1  ADQQ8Y0TI0OFYZ1  AE3EARS17OIZTCZ  AGWMH5U0ZGY385N
+        AMPLNJJO7VC9B0Z  AMZDPTPDGW7IJJI  ATA0N1WYQOOTIB6  AN06A258WERMYXN
+        A5M2VW4YNF1D8HB  AFPBCW7DQ204SL0  A6WO8Y1C422PBUN  AXY45VP2SHRDU0E
+        A6K48N7EQQV0MFK  AJL60SXZWS2H9R4
+
+
+      Context: {'table': 'times', 'col': 'wid'}
+      >
+
 
 # TODOs
 
