@@ -116,6 +116,16 @@ def str2sqlval((t, val)):
     return val
 
 
+def infer_col_type(col):
+  c = Counter()
+  for v in col:
+    t = get_type(v)
+    if t is not None:
+      c[t] += 1
+  most_common = c.most_common(1)
+  typ = len(most_common) and most_common[0][0] or str
+  return typ
+
 
 def infer_col_types(iterf):
     """
