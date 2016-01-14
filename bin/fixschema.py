@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import readline
 import cmd
 import pprint
