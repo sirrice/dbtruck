@@ -172,9 +172,12 @@ class SchemaFixer(cmd.Cmd):
     q = "SELECT distinct %s FROM %s LIMIT 50" % (col, table)
     vals = [row[0] for row in self.conn.execute(q)]
     print "%s.%s %s\tinferred type %s\n" % (table, col, typ, self.get_inferred_type(table, col))
-    pprint(tableize(vals[:50]))
-    print
 
+    if vals:
+      pprint(tableize(vals[:50]))
+    else:
+      print "\tTable has no rows"
+    print
 
 
   def emptyline(self):
@@ -416,6 +419,109 @@ class SchemaFixer(cmd.Cmd):
           print "Giving up"
           return
 
+  def do_compatible(self, line):
+    """
+    Find all tables in database that are UNION compatible with user provided table
+
+      compatible [table]
+      compatible
+
+    """
+    args = self.read_args(line, "table")
+    if not args: return
+    table, = args
+
+    q = """
+    SELECT table_name
+    FROM information_schema.columns 
+    WHERE table_schema not in ('information_schema', 'pg_catalog')
+    GROUP BY table_name
+    ORDER BY table_name
+    """
+
+    cur = self.conn.execute(q)
+    tables = [row[0] for row in cur]
+
+    schema = self.get_schema(table)
+
+    compatible = []
+    for t in tables:
+      if t == table: continue
+      try:
+        q = "SELECT * from %s  UNION SELECT * from %s LIMIT 1" % (table, t)
+        self.conn.execute(q)
+        compatible.append(t)
+      except:
+        continue
+
+    if compatible:
+      print "The following tables are UNION compatible with %s" % table
+      for t in compatible:
+        print "\t", t
+    else:
+      print "No tables UNION compatible with %s" % table
+
+
+
+
+  @err_wrapper
+  def do_map(self, line):
+    """
+    Map the column names from source table to destination table by renaming the columns one by one.
+    Prompts you before actually changing the source table.
+
+      map [src table name] [dst table name]
+
+    """
+    args = self.read_args(line, "fromtable", "totable")
+    if not args: return
+    src, dst = args
+
+    # check union compatibility
+    try:
+      q = "SELECT * from %s  UNION SELECT * from %s LIMIT 0" % (src, dst)
+    except:
+      print "Tables %s and %s are not UNION compatible" % (src, dst)
+      return
+
+    srcschema = self.get_schema(src)
+    dstschema = self.get_schema(dst)
+    srccols = set(zip(*srcschema)[0])
+    dstcols = set(zip(*dstschema)[0])
+    qs = []
+    data = []
+    conflict = False
+    print "Renaming: "
+    for spair, dpair in zip(srcschema, dstschema):
+      if dpair[0] == spair[0] and dpair[0] in srccols:
+        data.append(("%s.%s" % (src, spair[0]), "->", dpair[0], "skipped"))
+      elif dpair[0] != spair[0] and dpair[0] in srccols:
+        data.append(("%s.%s" % (src, spair[0]), "->", dpair[0], "conflict (%s.%s exists)" % (src, dpair[0])))
+        conflict = True
+      else:
+        data.append(("%s.%s" % (src, spair[0]), "->", dpair[0], "OK"))
+
+      if dpair[0] not in srccols and dpair[0] != spair[0]:
+        q = "ALTER TABLE %s RENAME %s TO %s" % (src, spair[0], dpair[0])
+        qs.append(q)
+
+    pprint(data)
+
+    if conflict:
+      print "Conflicting assignments detected.  Aborting"
+      return
+
+
+    print 
+    val = raw_input("Type 'y' to apply renaming to %s.  Anything else to abort  > " % src)
+    if val.strip() == 'y':
+      if qs:
+        self.conn.execute(";".join(qs))
+        self.clear_schema(src)
+      print "Renamed"
+      self.do_cols(src)
+    else:
+      print "Aborted"
 
   def do_EOF(self, line):
     return True
