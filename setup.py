@@ -7,7 +7,7 @@ except ImportError:
 from setuptools import setup, find_packages
 
 setup(name="dbtruck",
-      version="0.0.11",
+      version="0.0.12",
       description="Dump your data into your database",
       license="MIT",
       author="Eugene Wu",
