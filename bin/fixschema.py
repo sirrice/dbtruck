@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import readline
 import cmd
-import pprint
 from sqlalchemy import *
 
 from dbtruck.infertypes import infer_col_type
@@ -183,6 +182,15 @@ class SchemaFixer(cmd.Cmd):
   def emptyline(self):
     pass
 
+
+
+  ##################################################
+  #
+  # Begin Commands
+  #
+  ##################################################
+
+
   def do_c(self, uri):
     """
     Connect to database using URI.  The latter assumes localhost
@@ -239,6 +247,43 @@ class SchemaFixer(cmd.Cmd):
     tables  = ["{} {:>2}".format(*p) for p in pairs]
     print "printing"
     pprint(tableize(tables, 2))
+
+
+  @err_wrapper
+  def do_rows(self, line):
+    """
+    list rows in table.  The latter looks for a previously used table argument.
+
+      cols [table] [n rows]
+      cols [n rows]
+
+    """
+    args = self.read_args(line, "table", "nrows")
+    if not args: return
+    table, N = args
+    N = int(N)
+    self.cmds.append(dict(cmd="rows", table=table, nrows=N))
+
+    schema = self.get_schema(table)
+    cur = self.conn.execute("SELECT * FROM %s LIMIT %d" % (table, N))
+    rows = [list(row) for row in cur]
+    cols = zip(*rows)
+
+    data = []
+    buf = []
+    for (col, typ), col_vals in zip(schema, cols):
+      header = "%s(%s)" % (col, str(typ)[:4])
+      buf.append([header, "-" * len(header)] + list(col_vals))
+
+      if len(buf) >= 5:
+        data.extend(map(list, (zip(*buf))))
+        data.append([""] * len(buf))
+        buf = []
+    if buf:
+      data.extend(map(list, zip(*buf)))
+
+    pprint(data)
+
 
   @err_wrapper
   def do_cols(self, line):
@@ -522,6 +567,44 @@ class SchemaFixer(cmd.Cmd):
       self.do_cols(src)
     else:
       print "Aborted"
+
+  def do_promote(self, line):
+    """
+    Promote values of the first row into the attribute names in the schema
+    NOTE: Strongly consider running the "rows" command to see the values beforehand
+
+    promote [table]
+    promote 
+    """
+
+    args = self.read_args(line, "table")
+    if not args: return
+    table, = args
+
+    schema = self.get_schema(table)
+
+    q = "SELECT * FROM %s LIMIT 1" % table
+    row = self.conn.execute(q).fetchone()
+
+
+    qs = []
+    for (oldcol, typ), newcol in zip(schema, row):
+      q = "ALTER TABLE %s RENAME %s TO %s" % (table, oldcol, newcol)
+      qs.append(q)
+      print "Rename %s.%s\t--> %s.%s" % (table, oldcol, table, newcol)
+    q = "DELETE FROM %s WHERE ctid IN ( SELECT ctid FROM %s LIMIT 1)" % (table, table)
+    qs.append(q)
+    print
+
+    val = raw_input("Type 'y' to promote to %s.  Anything else to abort  > " % table)
+    if val.lower() in ('y', 'yes'):
+      self.conn.execute(";".join(qs))
+      self.clear_schema(table)
+    else:
+      print "aborted!\n"
+
+
+
 
   def do_EOF(self, line):
     return True
