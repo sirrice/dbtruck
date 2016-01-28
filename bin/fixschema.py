@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import random
 import readline
 import cmd
 from sqlalchemy import *
@@ -261,7 +262,11 @@ class SchemaFixer(cmd.Cmd):
     args = self.read_args(line, "table", "nrows")
     if not args: return
     table, N = args
-    N = int(N)
+    try:
+      N = int(N)
+    except:
+      table = N
+      N = 10
     self.cmds.append(dict(cmd="rows", table=table, nrows=N))
 
     schema = self.get_schema(table)
@@ -284,6 +289,12 @@ class SchemaFixer(cmd.Cmd):
 
     pprint(data)
 
+  @err_wrapper
+  def do_schema(self, line):
+    """
+    Alias for the "cols" command
+    """
+    return self.do_cols(line)
 
   @err_wrapper
   def do_cols(self, line):
@@ -568,6 +579,7 @@ class SchemaFixer(cmd.Cmd):
     else:
       print "Aborted"
 
+  @err_wrapper
   def do_promote(self, line):
     """
     Promote values of the first row into the attribute names in the schema
@@ -586,14 +598,32 @@ class SchemaFixer(cmd.Cmd):
     q = "SELECT * FROM %s LIMIT 1" % table
     row = self.conn.execute(q).fetchone()
 
+    # Check if there are duplicates, if so, abort
+    dups = [v for i, v in enumerate(row) if v in row[i+1:]]
+    if dups:
+      print "Aborting because there are duplicate values in the first row: \n\t%s" % (",".join(dups))
+      return
 
     qs = []
-    for (oldcol, typ), newcol in zip(schema, row):
+    tmpcols = []
+    data = [["Renaming:"]]
+    # First rename col names to nonsensical namesto avoid conflicts
+    # Then rename to target names
+    for idx, (oldcol, typ) in enumerate(schema):
+      newcol = "__attr_%d_%d" % (random.randint(0, 10000), idx)
       q = "ALTER TABLE %s RENAME %s TO %s" % (table, oldcol, newcol)
+      tmpcols.append(newcol)
       qs.append(q)
-      print "Rename %s.%s\t--> %s.%s" % (table, oldcol, table, newcol)
+
+    for (oldcol, typ), curcol, newcol in zip(schema, tmpcols, row):
+      q = "ALTER TABLE %s RENAME %s TO %s" % (table, curcol, newcol)
+      qs.append(q)
+      data.append(["%s.%s" % (table, oldcol), "-->", "%s.%s" % (table, newcol)])
+
     q = "DELETE FROM %s WHERE ctid IN ( SELECT ctid FROM %s LIMIT 1)" % (table, table)
     qs.append(q)
+
+    pprint(data)
     print
 
     val = raw_input("Type 'y' to promote to %s.  Anything else to abort  > " % table)
@@ -604,7 +634,49 @@ class SchemaFixer(cmd.Cmd):
       print "aborted!\n"
 
 
+  @err_wrapper
+  def do_q(self, line):
+    """
+    Run a query on the current database connection.  Only prints the first 20 rows
 
+    q [SQL QUERY]
+    q SELECT * FROM foo LIMIT 100;
+    """
+
+    q = line
+    cur = self.conn.execute(q)
+    data = [cur.keys()]
+    data.extend([list(row) for i, row in zip(range(20), cur)])
+    pprint(data)
+
+
+  def do_demote(self, line):
+    """
+    XXX: NOT IMPLEMENTED!
+    Demote attribute names into a record.  Implicitly casts all columns to text. 
+    NOTE: Strongly consider running the "rows" command to see the values beforehand
+
+    promote [table]
+    promote 
+    """
+    print "Not implemented"
+    return
+
+    args = self.read_args(line, "table")
+    if not args: return
+    table, = args
+
+    schema = self.get_schema(table)
+
+    # demoting is hard..
+
+    val = raw_input("Demoting %s's schema attributes to record.  May cast columns into text!" +
+                    "\nPress 'y' to continue, anything else to abort  > " % table)
+    if val.lower() in ('y', 'yes'):
+      self.conn.execute(";".join(qs))
+      self.clear_schema(table)
+    else:
+      print "aborted!\n"
 
   def do_EOF(self, line):
     return True
